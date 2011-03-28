@@ -46,3 +46,16 @@ ifneq (,$(findstring -DWITH_VOIPTOOL,$(COPTS)))
   endif
 endif
 
+
+
+ifndef HAVE_GNPLIB
+  ifeq ($(HAVE_PKGCFG), yes)
+    HAVE_GNPLIB := $(shell $(PKGCFG) --exists gnplib && echo yes || echo no)
+    ifeq ($(HAVE_GNPLIB), yes)
+      GNPLIB_LIBS := $(shell $(PKGCFG) --libs gnplib)
+      LIBS += $(GNPLIB_LIBS)
+      CFLAGS += $(shell $(PKGCFG) --cflags gnplib) -DHAVE_GNPLIB
+    endif
+  endif
+endif
+

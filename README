@@ -104,6 +104,7 @@ Bottom-up:
      sctpapp/            SCTP applications
 
    world/                scenario manager, MF channel manager //TODO is here the MF ch.m.?
+     inet/               global Internet delay model
 
    nodes/                protocol stacks, host and router models
      inet/               IP-based components
