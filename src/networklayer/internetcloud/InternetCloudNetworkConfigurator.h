@@ -16,15 +16,18 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __INET_INTERNETCLOUDNETWORKCONFIGURATOR_H
-#define __INET_INTERNETCLOUDNETWORKCONFIGURATOR_H
+#ifndef __INET_INTERNETCLOUD_NETWORKCONFIGURATOR_H
+#define __INET_INTERNETCLOUD_NETWORKCONFIGURATOR_H
+
+#include <string>
+#include <vector>
 
 #include "INETDefs.h"
 
 #include "IPv4Address.h"
 
+// Forward declarations:
 namespace gnplib { namespace impl { namespace network { namespace gnp { class GnpNetLayerFactory; } } } }
-
 class IInterfaceTable;
 class IRoutingTable;
 
@@ -49,9 +52,10 @@ class INET_API InternetCloudNetworkConfigurator : public cSimpleModule
     };
     typedef std::vector<NodeInfo> NodeInfoVector;
 
-public:
+  public:
     InternetCloudNetworkConfigurator();
     virtual ~InternetCloudNetworkConfigurator();
+
   protected:
     virtual int numInitStages() const  {return 3;}
     virtual void initialize(int stage);
@@ -64,10 +68,10 @@ public:
 
     virtual void setDisplayString(cTopology& topo, NodeInfoVector& nodeInfo);
 
-private:
+  private:
     InternetCloudNetworkConfigurator(const InternetCloudNetworkConfigurator& orig);
     gnplib::impl::network::gnp::GnpNetLayerFactory *netLayerFactoryGnp;
 };
 
-#endif
+#endif  // __INET_INTERNETCLOUD_NETWORKCONFIGURATOR_H
 

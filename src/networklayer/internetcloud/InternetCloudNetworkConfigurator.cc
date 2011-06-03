@@ -26,11 +26,11 @@
 
 #include "InternetCloudNetworkConfigurator.h"
 
-#include "IRoutingTable.h"
 #include "IInterfaceTable.h"
-#include "IPvXAddressResolver.h"
 #include "InterfaceEntry.h"
 #include "IPv4InterfaceData.h"
+#include "IPvXAddressResolver.h"
+#include "IRoutingTable.h"
 
 
 Define_Module(InternetCloudNetworkConfigurator);
@@ -235,7 +235,8 @@ void InternetCloudNetworkConfigurator::assignAddresses(cTopology& topo, NodeInfo
                 if (internet_downlink)
                 {
                     if (linkIn->getLocalGateId() != ie->getNodeInputGateId())
-                         throw cRuntimeError("%s uses different interfaces to connect upstream/downstream to the Internet", node->getModule()->getFullName());
+                        throw cRuntimeError("%s uses different interfaces to connect upstream/downstream to the Internet", node->getModule()->getFullName());
+
                     const double downstream_bw_bps(netLayer->getMaxDownloadBandwidth()*8.0); // bytes/s -> bit/s
                     const double downstream_delay_s(netLayer->getAccessLatency()/(2.0*1000.0)); // distribute delay evenly between up- and downstream, ms -> s
                     EV << "Configuring downstream channel with " << downstream_bw_bps << "bps and " << downstream_delay_s << "s wire delay" << endl;
@@ -248,10 +249,8 @@ void InternetCloudNetworkConfigurator::assignAddresses(cTopology& topo, NodeInfo
                     throw cRuntimeError("Please use a DatarateChannel to connect %s downstream from the Internet", node->getModule()->getFullName());
                 }
             }
-
         }
         EV << "Configured internet access from " << node->getModule()->getFullName() << " through " << ie->getName() << "\n";
-
     }
 }
 

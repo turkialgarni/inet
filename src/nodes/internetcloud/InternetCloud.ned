@@ -23,7 +23,11 @@ package inet.nodes.internetcloud;
 import inet.base.NotificationBoard;
 import inet.linklayer.IExternalNic;
 import inet.linklayer.IWiredNic;
+import inet.networklayer.arp.ARP;
 import inet.networklayer.common.InterfaceTable;
+import inet.networklayer.ipv4.ErrorHandling;
+import inet.networklayer.ipv4.ICMP;
+import inet.networklayer.ipv4.IPv4;
 import inet.networklayer.ipv4.RoutingTable;
 import inet.util.PcapRecorder;
 
@@ -43,6 +47,87 @@ module InternetCloud
     gates:
         inout pppg[] @labels(PPPFrame-conn);
         inout ethg[] @labels(EtherFrame-conn);
+    types:
+        simple DelayGenerator
+        {
+            parameters:
+                bool usePingErRttData = default(false);
+                bool useAnalyticalRtt = default(false);
+                bool usePingErJitter = default(false);
+                bool usePingErPacketLoss = default(false);
+                bool useAccessLatency = default(false);
+                @display("i=block/delay");
+            gates:
+                input ipIn;
+                output ipOut;
+        }
+        module InternetCloudNetworkLayer
+        {
+            parameters:
+                bool proxyARP = default(true);
+                bool usePingErRttData = default(false);
+                bool useAnalyticalRtt = default(false);
+                bool usePingErJitter = default(true);
+                bool usePingErPacketLoss = default(false);
+                bool useAccessLatency = default(false);
+                @display("i=block/fork");
+            gates:
+                input ifIn[] @labels(IPDatagram);
+                output ifOut[];
+            submodules:
+                ip: IPv4 {
+                    parameters:
+                        timeToLive = 32;
+                        multicastTimeToLive = 32;
+                        fragmentTimeout = 60s;
+                        protocolMapping = "1:0,138:0";
+                        @display("p=85,95;q=queue");
+                    gates:
+                        transportIn[1];
+                        transportOut[1];
+                        queueIn[sizeof(ifIn)];
+                }
+
+                delayGenerator: DelayGenerator {
+                    parameters:
+                        usePingErRttData = usePingErRttData;
+                        useAnalyticalRtt = useAnalyticalRtt;
+                        usePingErJitter = usePingErJitter;
+                        usePingErPacketLoss = usePingErPacketLoss;
+                        useAccessLatency = useAccessLatency;
+                        @display("p=160,123");
+                }
+                arp: ARP {
+                    parameters:
+                        proxyARP = proxyARP;
+                        @display("p=163,206;q=pendingQueue");
+                    gates:
+                        nicOut[sizeof(ifOut)];
+                }
+                icmp: ICMP {
+                    parameters:
+                        @display("p=160,33");
+                }
+                errorHandling: ErrorHandling {
+                    parameters:
+                        @display("p=239,33");
+                }
+            connections allowunconnected:
+                // transport Layer
+                ip.transportOut[0] --> icmp.localIn;
+                ip.transportIn[0] <-- icmp.sendOut;
+
+                icmp.errorOut --> errorHandling.in;
+
+                ip.queueOut --> delayGenerator.ipIn;
+                delayGenerator.ipOut --> arp.ipIn;
+
+                // L2 interfaces to IP and from ARP
+                for i=0..sizeof(ifOut)-1 {
+                    ifIn[i] --> { @display("m=s"); } --> ip.queueIn[i];
+                    ifOut[i] <-- { @display("m=s"); } <-- arp.nicOut[i];
+                }
+        }
     submodules:
         notificationBoard: NotificationBoard {
             parameters:

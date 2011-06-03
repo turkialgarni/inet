@@ -553,7 +553,11 @@
         id="DELFOI"
         name="DELFOI"
         description = "DELFOI. Required external library: gnplib
-          Install method: get gnplib: 
+          Install method: create a directory somewhere, cd to it, 
+          svn co https://gnplib.svn.sourceforge.net/svnroot/gnplib gnplib
+          configure
+          make
+          sudo make install
         "
         initiallyEnabled = "false"
         requires = "IPv4"
@@ -565,5 +569,19 @@
         extraSourceFolders = ""
         compileFlags = "-I/usr/local/include"
         linkerFlags = "-lgnp -L/usr/local/lib"
+        />
+    <feature
+        id="DELFOI_examples"
+        name="DELFOI examples"
+        description = "DELFOI eamples."
+        initiallyEnabled = "false"
+        requires = "DELFOI PPP"
+        labels = ""
+        nedPackages = "
+                       inet.examples.internetcloud
+                      "
+        extraSourceFolders = ""
+        compileFlags = ""
+        linkerFlags = ""
         />
 </features>
