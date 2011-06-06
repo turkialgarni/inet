@@ -15,6 +15,9 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
+#ifndef HAVE_GNPLIB
+#error Please install gnplib or disable 'Internet Cloud' feature
+#endif
 
 #include <gnplib/impl/network/gnp/GeoLocationOracle.h>
 #include <gnplib/impl/network/gnp/GnpLatencyModel.h>

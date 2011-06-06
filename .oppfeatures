@@ -550,14 +550,14 @@
         linkerFlags = ""
         />
     <feature
-        id="DELFOI"
-        name="DELFOI"
-        description = "DELFOI. Required external library: gnplib
+        id="InternetCloud"
+        name="Internet Cloud"
+        description = "Internet Cloud (was 'Delfoi'). Required external library: gnplib.
           Install method: create a directory somewhere, cd to it, 
-          svn co https://gnplib.svn.sourceforge.net/svnroot/gnplib gnplib
-          configure
-          make
-          sudo make install
+          svn co https://gnplib.svn.sourceforge.net/svnroot/gnplib gnplib;
+          configure;
+          make;
+          sudo make install;
         "
         initiallyEnabled = "false"
         requires = "IPv4"
@@ -567,15 +567,15 @@
                        inet.nodes.internetcloud
                       "
         extraSourceFolders = ""
-        compileFlags = "-I/usr/local/include"
-        linkerFlags = "-lgnp -L/usr/local/lib"
+        compileFlags = "-DWITH_INTERNETCLOUD"
+        linkerFlags = ""
         />
     <feature
-        id="DELFOI_examples"
-        name="DELFOI examples"
-        description = "DELFOI eamples."
+        id="InternetCloud_examples"
+        name="Internet Cloud examples"
+        description = "Internet Cloud eamples."
         initiallyEnabled = "false"
-        requires = "DELFOI PPP"
+        requires = "InternetCloud PPP"
         labels = ""
         nedPackages = "
                        inet.examples.internetcloud

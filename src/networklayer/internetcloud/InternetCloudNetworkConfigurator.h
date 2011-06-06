@@ -19,6 +19,10 @@
 #ifndef __INET_INTERNETCLOUD_NETWORKCONFIGURATOR_H
 #define __INET_INTERNETCLOUD_NETWORKCONFIGURATOR_H
 
+#ifndef HAVE_GNPLIB
+#error Please install gnplib or disable 'Internet Cloud' feature
+#endif
+
 #include <string>
 #include <vector>
 

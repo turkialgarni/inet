@@ -18,6 +18,10 @@
 #ifndef __INET_INTERNETCLOUD_DELAYGENERATOR_H
 #define __INET_INTERNETCLOUD_DELAYGENERATOR_H
 
+#ifndef HAVE_GNPLIB
+#error Please install gnplib or disable 'Internet Cloud' feature
+#endif
+
 #include "INETDefs.h"
 
 class INET_API DelayGenerator : public cSimpleModule

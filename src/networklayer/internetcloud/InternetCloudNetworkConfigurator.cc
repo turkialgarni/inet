@@ -18,7 +18,12 @@
 //
 
 
+#ifndef HAVE_GNPLIB
+#error Please install gnplib or disable 'Internet Cloud' feature
+#endif
+
 #include <algorithm>
+
 #include <gnplib/impl/network/gnp/GnpLatencyModel.h>
 #include <gnplib/impl/network/gnp/GnpNetLayerFactory.h>
 #include <gnplib/api/common/random/Rng.h>
