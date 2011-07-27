@@ -15,22 +15,23 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "InternetPropagationDelayGate.h"
-
-Define_Module(InternetPropagationDelayGate);
-
-#ifdef HAVE_GNPLIB
 
 #include <gnplib/impl/network/gnp/GeoLocationOracle.h>
 #include <gnplib/impl/network/gnp/GnpLatencyModel.h>
 #include <gnplib/impl/network/IPv4NetID.h>
-#include "IPDatagram.h"
+
+#include "DelayGenerator.h"
+
+#include "IPv4Datagram.h"
+
+
+Define_Module(DelayGenerator);
 
 namespace GeoLocationOracle=gnplib::impl::network::gnp::GeoLocationOracle;
 using gnplib::impl::network::IPv4NetID;
 
 
-void InternetPropagationDelayGate::initialize(int stage)
+void DelayGenerator::initialize(int stage)
 {
     if (stage==1)
     {
@@ -45,9 +46,9 @@ void InternetPropagationDelayGate::initialize(int stage)
     }
 }
 
-void InternetPropagationDelayGate::handleMessage(cMessage *msg)
+void DelayGenerator::handleMessage(cMessage *msg)
 {
-    IPDatagram*pkt(dynamic_cast<IPDatagram*>(msg));
+    IPv4Datagram *pkt(dynamic_cast<IPv4Datagram*>(msg));
     if (pkt)
     {
         const IPv4NetID src(pkt->getSrcAddress().getInt());
@@ -64,15 +65,3 @@ void InternetPropagationDelayGate::handleMessage(cMessage *msg)
     }
 }
 
-#else
-
-// gnplib was not found => compile as stub
-
-void InternetPropagationDelayGate::initialize(int stage)
-{
-    error("Please compile INET with gnplib support to use this module!");
-}
-
-void InternetPropagationDelayGate::handleMessage(cMessage *msg) {}
-
-#endif

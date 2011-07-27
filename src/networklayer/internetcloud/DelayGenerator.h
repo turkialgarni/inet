@@ -15,20 +15,20 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef _INTERNETPROPAGATIONDELAYGATE_H
-#define	_INTERNETPROPAGATIONDELAYGATE_H
+#ifndef __INET_DELAYGENERATOR_H
+#define __INET_DELAYGENERATOR_H
 
 #include <omnetpp.h>
 
-class InternetPropagationDelayGate : public cSimpleModule
+class DelayGenerator : public cSimpleModule
 {
-public:
-      inline virtual int numInitStages() const  {return 2;}
-      virtual void initialize(int stage);
+  public:
+    inline virtual int numInitStages() const  {return 2;}
+    virtual void initialize(int stage);
 
-      void handleMessage(cMessage *msg);
+    void handleMessage(cMessage *msg);
 
-private:
+  private:
     int outGateId;
 };
 

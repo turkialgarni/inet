@@ -17,22 +17,23 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "GnpNetworkConfigurator.h"
-
-Define_Module(GnpNetworkConfigurator);
-
-#ifdef HAVE_GNPLIB
 
 #include <algorithm>
 #include <gnplib/impl/network/gnp/GnpLatencyModel.h>
 #include <gnplib/impl/network/gnp/GnpNetLayerFactory.h>
 #include <gnplib/api/common/random/Rng.h>
 #include <gnplib/impl/network/AbstractNetLayer.h>
+
+#include "InternetCloudNetworkConfigurator.h"
+
 #include "IRoutingTable.h"
 #include "IInterfaceTable.h"
-#include "IPAddressResolver.h"
+#include "IPvXAddressResolver.h"
 #include "InterfaceEntry.h"
 #include "IPv4InterfaceData.h"
+
+
+Define_Module(InternetCloudNetworkConfigurator);
 
 namespace {
 const char* INTERNET_CLOUD = "InternetCloud";
@@ -70,7 +71,7 @@ using gnplib::impl::network::gnp::GnpLatencyModel;
 using gnplib::impl::network::gnp::GnpNetLayer;
 
 
-GnpNetworkConfigurator::GnpNetworkConfigurator()
+InternetCloudNetworkConfigurator::InternetCloudNetworkConfigurator()
 : netLayerFactoryGnp(new GnpNetLayerFactory) { }
 
 /**
@@ -81,7 +82,7 @@ int intrand2(int r)
 	return intrand(r);
 }
 
-void GnpNetworkConfigurator::initialize(int stage)
+void InternetCloudNetworkConfigurator::initialize(int stage)
 {
     if (stage==0)
     {
@@ -117,12 +118,12 @@ void GnpNetworkConfigurator::initialize(int stage)
     }
 }
 
-GnpNetworkConfigurator::~GnpNetworkConfigurator()
+InternetCloudNetworkConfigurator::~InternetCloudNetworkConfigurator()
 {
     delete netLayerFactoryGnp;
 }
 
-void GnpNetworkConfigurator::extractTopology(cTopology& topo, NodeInfoVector& nodeInfo)
+void InternetCloudNetworkConfigurator::extractTopology(cTopology& topo, NodeInfoVector& nodeInfo)
 {
     // extract topology
     topo.extractByProperty("node");
@@ -133,11 +134,11 @@ void GnpNetworkConfigurator::extractTopology(cTopology& topo, NodeInfoVector& no
     for (int i=0; i<topo.getNumNodes(); i++)
     {
         cModule *mod = topo.getNode(i)->getModule();
-        nodeInfo[i].isIPNode = IPAddressResolver().findInterfaceTableOf(mod)!=NULL;
+        nodeInfo[i].isIPNode = IPvXAddressResolver().findInterfaceTableOf(mod)!=NULL;
         if (nodeInfo[i].isIPNode)
         {
-            nodeInfo[i].ift = IPAddressResolver().interfaceTableOf(mod);
-            nodeInfo[i].rt = IPAddressResolver().routingTableOf(mod);
+            nodeInfo[i].ift = IPvXAddressResolver().interfaceTableOf(mod);
+            nodeInfo[i].rt = IPvXAddressResolver().routingTableOf(mod);
         }
         if (mod->hasPar("group"))
             nodeInfo[i].group=mod->par("group").stdstringValue();
@@ -159,7 +160,7 @@ void GnpNetworkConfigurator::extractTopology(cTopology& topo, NodeInfoVector& no
     }
 }
 
-void GnpNetworkConfigurator::assignAddresses(cTopology& topo, NodeInfoVector& nodeInfo)
+void InternetCloudNetworkConfigurator::assignAddresses(cTopology& topo, NodeInfoVector& nodeInfo)
 {
     // assign IP addresses
     for (int i=0; i<topo.getNumNodes(); i++)
@@ -173,7 +174,9 @@ void GnpNetworkConfigurator::assignAddresses(cTopology& topo, NodeInfoVector& no
         GnpNetLayer* netLayer=netLayerFactoryGnp->newNetLayer(nodeInfo[i].group); // TODO: This is a memory leak!!!
         uint32 addr=netLayer->getNetID().getID();
 
-        EV << "Assigning " << node->getModule()->getFullName() << " of group \"" << nodeInfo[i].group << "\" IP-Id " << addr << " (pseudo-IP address " << IPAddress(addr) << ")\n";
+        EV << "Assigning " << node->getModule()->getFullName() << " of group \""
+           << nodeInfo[i].group << "\" IP-Id " << addr << " (pseudo-IP address "
+           << IPv4Address(addr) << ")\n";
 
         nodeInfo[i].address.set(addr);
 
@@ -184,8 +187,8 @@ void GnpNetworkConfigurator::assignAddresses(cTopology& topo, NodeInfoVector& no
             InterfaceEntry *ie = ift->getInterface(k);
             if (!ie->isLoopback())
             {
-                ie->ipv4Data()->setIPAddress(IPAddress(addr));
-                ie->ipv4Data()->setNetmask(IPAddress::ALLONES_ADDRESS); // full address must match for local delivery
+                ie->ipv4Data()->setIPAddress(IPv4Address(addr));
+                ie->ipv4Data()->setNetmask(IPv4Address::ALLONES_ADDRESS); // full address must match for local delivery
             }
         }
 
@@ -252,7 +255,7 @@ void GnpNetworkConfigurator::assignAddresses(cTopology& topo, NodeInfoVector& no
     }
 }
 
-void GnpNetworkConfigurator::addDefaultRoutes(cTopology& topo, NodeInfoVector& nodeInfo)
+void InternetCloudNetworkConfigurator::addDefaultRoutes(cTopology& topo, NodeInfoVector& nodeInfo)
 {
     // add default route to nodes with exactly one (non-loopback) interface
     for (int i=0; i<topo.getNumNodes(); i++)
@@ -281,18 +284,18 @@ void GnpNetworkConfigurator::addDefaultRoutes(cTopology& topo, NodeInfoVector& n
            << " has only one (non-loopback) interface, adding default route\n";
 
         // add route
-        IPRoute *e = new IPRoute();
-        e->setHost(IPAddress());
-        e->setNetmask(IPAddress());
+        IPv4Route *e = new IPv4Route();
+        e->setHost(IPv4Address());
+        e->setNetmask(IPv4Address());
         e->setInterface(ie);
-        e->setType(IPRoute::REMOTE);
-        e->setSource(IPRoute::MANUAL);
+        e->setType(IPv4Route::REMOTE);
+        e->setSource(IPv4Route::MANUAL);
         //e->getMetric() = 1;
         rt->addRoute(e);
     }
 }
 
-void GnpNetworkConfigurator::fillRoutingTables(cTopology& topo, NodeInfoVector& nodeInfo)
+void InternetCloudNetworkConfigurator::fillRoutingTables(cTopology& topo, NodeInfoVector& nodeInfo)
 {
     // fill in routing tables with static routes
     for (int i=0; i<topo.getNumNodes(); i++)
@@ -303,7 +306,7 @@ void GnpNetworkConfigurator::fillRoutingTables(cTopology& topo, NodeInfoVector& 
         if (!nodeInfo[i].isIPNode)
             continue;
 
-        IPAddress destAddr = nodeInfo[i].address;
+        IPv4Address destAddr = nodeInfo[i].address;
         std::string destModName = destNode->getModule()->getFullName();
 
         // calculate shortest paths from everywhere towards destNode
@@ -323,7 +326,7 @@ void GnpNetworkConfigurator::fillRoutingTables(cTopology& topo, NodeInfoVector& 
             if (nodeInfo[j].usesDefaultRoute)
                 continue; // already added default route here
 
-            IPAddress atAddr = nodeInfo[j].address;
+            IPv4Address atAddr = nodeInfo[j].address;
 
             IInterfaceTable *ift = nodeInfo[j].ift;
 
@@ -332,29 +335,29 @@ void GnpNetworkConfigurator::fillRoutingTables(cTopology& topo, NodeInfoVector& 
             if (!ie)
                 error("%s has no interface for output gate id %d", ift->getFullPath().c_str(), outputGateId);
 
-            EV << "  from " << atNode->getModule()->getFullName() << "=" << IPAddress(atAddr);
-            EV << " towards " << destModName << "=" << IPAddress(destAddr) << " interface " << ie->getName() << endl;
+            EV << "  from " << atNode->getModule()->getFullName() << "=" << IPv4Address(atAddr);
+            EV << " towards " << destModName << "=" << IPv4Address(destAddr) << " interface " << ie->getName() << endl;
 
             // add route
             IRoutingTable *rt = nodeInfo[j].rt;
-            IPRoute *e = new IPRoute();
+            IPv4Route *e = new IPv4Route();
             e->setHost(destAddr);
-            e->setNetmask(IPAddress(255,255,255,255)); // full match needed
+            e->setNetmask(IPv4Address(255,255,255,255)); // full match needed
             e->setInterface(ie);
-            e->setType(IPRoute::DIRECT);
-            e->setSource(IPRoute::MANUAL);
+            e->setType(IPv4Route::DIRECT);
+            e->setSource(IPv4Route::MANUAL);
             //e->getMetric() = 1;
             rt->addRoute(e);
         }
     }
 }
 
-void GnpNetworkConfigurator::handleMessage(cMessage *msg)
+void InternetCloudNetworkConfigurator::handleMessage(cMessage *msg)
 {
     error("this module doesn't handle messages, it runs only in initialize()");
 }
 
-void GnpNetworkConfigurator::setDisplayString(cTopology& topo, NodeInfoVector& nodeInfo)
+void InternetCloudNetworkConfigurator::setDisplayString(cTopology& topo, NodeInfoVector& nodeInfo)
 {
     int numIPNodes = 0;
     for (int i=0; i<topo.getNumNodes(); i++)
@@ -367,27 +370,3 @@ void GnpNetworkConfigurator::setDisplayString(cTopology& topo, NodeInfoVector& n
     getDisplayString().setTagArg("t",0,buf);
 }
 
-#else
-
-// gnplib was not found => compile as stub
-
-namespace gnplib { namespace impl { namespace network { namespace gnp {
-    class GnpNetLayerFactory {};
-}}}}
-
-void GnpNetworkConfigurator::initialize(int stage)
-{
-    error("Please compile INET with gnplib support to use this module!");
-}
-
-GnpNetworkConfigurator::GnpNetworkConfigurator()
-: netLayerFactoryGnp(new gnplib::impl::network::gnp::GnpNetLayerFactory) {}
-GnpNetworkConfigurator::~GnpNetworkConfigurator() { delete netLayerFactoryGnp; }
-void GnpNetworkConfigurator::extractTopology(cTopology& topo, NodeInfoVector& nodeInfo) {}
-void GnpNetworkConfigurator::assignAddresses(cTopology& topo, NodeInfoVector& nodeInfo) {}
-void GnpNetworkConfigurator::addDefaultRoutes(cTopology& topo, NodeInfoVector& nodeInfo) {}
-void GnpNetworkConfigurator::fillRoutingTables(cTopology& topo, NodeInfoVector& nodeInfo) {}
-void GnpNetworkConfigurator::handleMessage(cMessage *msg) {}
-void GnpNetworkConfigurator::setDisplayString(cTopology& topo, NodeInfoVector& nodeInfo) {}
-
-#endif

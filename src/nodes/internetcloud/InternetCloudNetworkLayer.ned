@@ -20,12 +20,12 @@
 // Based on ../../nodes/inet/NetworkLayer.ned
 
 
-package inet.world.inet;
+package inet.nodes.internetcloud;
 
-import inet.networklayer.arp.ARP;
-import inet.networklayer.ipv4.ErrorHandling;
+import inet.networklayer.ipv4.IPv4;
 import inet.networklayer.ipv4.ICMP;
-import inet.networklayer.ipv4.IP;
+import inet.networklayer.ipv4.ErrorHandling;
+import inet.networklayer.arp.ARP;
 
 
 //
@@ -33,13 +33,13 @@ import inet.networklayer.ipv4.IP;
 //
 // Interfaces to transport layer: TCP, UDP, echo/ping, RSVP
 //
-module InternetLayer
+module InternetCloudNetworkLayer
 {
     parameters:
         bool proxyARP = default(true);
-        bool usePingErRttData    = default(false);
-        bool useAnalyticalRtt    = default(false);
-        bool usePingErJitter     = default(true);
+        bool usePingErRttData = default(false);
+        bool useAnalyticalRtt = default(false);
+        bool usePingErJitter = default(true);
         bool usePingErPacketLoss = default(false);
 
         @display("i=block/fork");
@@ -47,13 +47,28 @@ module InternetLayer
         input ifIn[] @labels(IPDatagram);
         output ifOut[];
 
+    types:
+        simple DelayGenerator
+        {
+            parameters:
+                bool usePingErRttData = default(false);
+                bool useAnalyticalRtt = default(false);
+                bool usePingErJitter = default(false);
+                bool usePingErPacketLoss = default(false);
+                bool useAccessLatency = default(false);
+                @display("i=block/delay");
+            gates:
+                input ipIn;
+                output ipOut;
+        }
+
     submodules:
-        ip: IP {
+        ip: IPv4 {
             parameters:
                 timeToLive = 32;
                 multicastTimeToLive = 32;
                 fragmentTimeout = 60s;
-                protocolMapping = "1:0";
+                protocolMapping = "1:0,138:0";
                 @display("p=85,95;q=queue");
             gates:
                 transportIn[1];
@@ -61,14 +76,14 @@ module InternetLayer
                 queueIn[sizeof(ifIn)];
         }
 
-        delayGenerator: InternetPropagationDelayGate {
+        delayGenerator: DelayGenerator {
             parameters:
-                usePingErRttData    = usePingErRttData;
-                useAnalyticalRtt    = useAnalyticalRtt;
-                usePingErJitter     = usePingErJitter;
+                usePingErRttData = usePingErRttData;
+                useAnalyticalRtt = useAnalyticalRtt;
+                usePingErJitter = usePingErJitter;
                 usePingErPacketLoss = usePingErPacketLoss;
-                useAccessLatency    = false;
-                @display("p=163,95");
+                useAccessLatency = false;
+                @display("p=160,123");
         }
         arp: ARP {
             parameters:

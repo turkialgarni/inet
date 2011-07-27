@@ -33,7 +33,7 @@ import inet.networklayer.arp.ARP;
 module NetworkLayer
 {
     parameters:
-        @display("i=block/fork");
+        @display("i=block/fork;bgb=312,224");
         bool proxyARP = default(true);
     gates:
         input ifIn[] @labels(IPv4Datagram);
@@ -57,7 +57,7 @@ module NetworkLayer
         ip: IPv4 {
             parameters:
                 protocolMapping = "6:0,17:1,1:2,2:3,46:4,89:5,132:6,48:7,138:7"; // see: http://www.iana.org/assignments/protocol-numbers
-                @display("p=85,95;q=queue");
+                @display("p=85,71;q=queue");
             gates:
                 transportIn[8];
                 transportOut[8];
@@ -66,7 +66,7 @@ module NetworkLayer
         arp: ARP {
             parameters:
                 proxyARP = proxyARP;
-                @display("p=202,142;q=pendingQueue");
+                @display("p=124,140;q=pendingQueue");
             gates:
                 nicOut[sizeof(ifOut)];
         }
@@ -76,7 +76,7 @@ module NetworkLayer
         }
         igmp: IGMP {
             parameters:
-                @display("p=85,30");
+                @display("p=197,109");
         }
         errorHandling: ErrorHandling {
             parameters:
@@ -117,7 +117,7 @@ module NetworkLayer
         ip.queueOut --> arp.ipIn;
 
         for i=0..sizeof(ifIn)-1 {
-            ifIn[i] --> ip.queueIn[i];
+            ifIn[i] --> { @display("m=s"); } --> ip.queueIn[i];
         }
         for i=0..sizeof(ifOut)-1 {
             arp.nicOut[i] --> ifOut[i];
