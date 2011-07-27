@@ -549,4 +549,21 @@
         compileFlags = ""
         linkerFlags = ""
         />
+    <feature
+        id="DELFOI"
+        name="DELFOI"
+        description = "DELFOI. Required external library: gnplib
+          Install method: get gnplib: 
+        "
+        initiallyEnabled = "false"
+        requires = "IPv4"
+        labels = ""
+        nedPackages = "
+                       inet.networklayer.internetcloud
+                       inet.nodes.internetcloud
+                      "
+        extraSourceFolders = ""
+        compileFlags = "-I/usr/local/include"
+        linkerFlags = "-lgnp -L/usr/local/lib"
+        />
 </features>
