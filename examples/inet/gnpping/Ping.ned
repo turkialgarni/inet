@@ -30,7 +30,8 @@ network PingNetwork
         int numSenders;
 
     types:
-        module GpnStandardHost extends StandardHost {
+        module GnpStandardHost extends StandardHost
+        {
             string group = default("");   // group ID for delay/jitter etc. parameter group 
         }
         channel C extends DatarateChannel
@@ -44,12 +45,9 @@ network PingNetwork
                 @display("p=61,163");
         }
 
-        sender[numSenders]: GpnStandardHost;
-
-        recip: GpnStandardHost;
-
+        sender[numSenders]: GnpStandardHost;
+        recip: GnpStandardHost;
         internet: InternetCloud;
-
     connections:
         recip.pppg++ <--> C <--> internet.pppg++;
         for i=0..numSenders-1 {
