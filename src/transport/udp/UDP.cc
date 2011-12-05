@@ -411,7 +411,7 @@ void UDP::processUndeliverablePacket(UDPPacket *udpPacket, cObject *ctrl)
     else
 #endif
 #ifdef WITH_IPv6
-    if (dynamic_cast<IPv6ControlInfo *>(udpPacket->getControlInfo()) != NULL)
+    if (dynamic_cast<IPv6ControlInfo *>(ctrl) != NULL)
     {
         if (!icmpv6)
             icmpv6 = ICMPv6Access().get();
