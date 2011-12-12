@@ -51,7 +51,7 @@ class INET_API IPv6 : public QueueBase
 #endif /* WITH_xMIPv6 */
 
     // working vars
-    long curFragmentId; // counter, used to assign unique fragmentIds to datagrams
+    unsigned int curFragmentId; // counter, used to assign unique fragmentIds to datagrams
     IPv6FragBuf fragbuf;  // fragmentation reassembly buffer
     simtime_t lastCheckTime; // when fragbuf was last checked for state fragments
     ProtocolMapping mapping; // where to send packets after decapsulation
@@ -73,6 +73,7 @@ class INET_API IPv6 : public QueueBase
         IPv6Datagram* datagram;
         InterfaceEntry* ie;
         MACAddress macAddr;
+        bool fromHL;
     };
 #endif /* WITH_xMIPv6 */
 
@@ -106,14 +107,6 @@ class INET_API IPv6 : public QueueBase
     virtual void handleReceivedICMP(ICMPv6Message *msg);
 
     /**
-     * Fragment packet if needed, then send it. The optional output gate
-     * index is only used if higher layer protocol explicitly requests
-     * the datagram to be sent out on a specific interface, bypassing
-     * the routing table.
-     */
-    virtual void fragmentAndRoute(IPv6Datagram *datagram, InterfaceEntry *destIE = NULL);
-
-    /**
      * Performs routing. Based on the routing decision, it dispatches to
      * localDeliver() for local packets, to fragmentAndSend() for forwarded packets,
      * to routeMulticastPacket() for multicast packets, or drops the packet if
@@ -124,8 +117,13 @@ class INET_API IPv6 : public QueueBase
     /**
      * Forwards packets to all multicast destinations, using fragmentAndSend().
      */
-    virtual void routeMulticastPacket(IPv6Datagram *datagram, InterfaceEntry *destIE, InterfaceEntry *fromIE);
+    virtual void routeMulticastPacket(IPv6Datagram *datagram, InterfaceEntry *destIE, InterfaceEntry *fromIE, bool fromHL);
 
+    /**
+     * Performs fragmentation if needed, and sends the original datagram or the fragments
+     * through the specified interface.
+     */
+    virtual void fragmentAndSend(IPv6Datagram *datagram, InterfaceEntry *ie, const MACAddress &nextHopAddr, bool fromHL);
     /**
      * Perform reassembly of fragmented datagrams, then send them up to the
      * higher layers using sendToHL().
