@@ -230,6 +230,10 @@ class INET_API IPv6Address
             return IPv6Address(*this).setPrefix(SOLICITED_NODE_PREFIX, 104);
         };
 
+        bool isSolicitedNodeMulticastAddress() const {
+            return matches(SOLICITED_NODE_PREFIX, 104);
+        }
+
         /**
          * RFC 3513: Section 2.6.1
          * The Subnet-Router anycast address is predefined.  Its format is as
