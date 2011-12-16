@@ -158,7 +158,11 @@ void FlatNetworkConfigurator::addDefaultRoutes(cTopology& topo, NodeInfoVector& 
 
 void FlatNetworkConfigurator::fillRoutingTables(cTopology& _topo, NodeInfoVector& nodeInfo)
 {
+    FILE *f = fopen("routingtables.txt", "w");
+    fprintf(f, "# atnode\tdestnode\tnexthopnode\n");
+
     WeightedTopology &topo = (WeightedTopology &)_topo;
+
     // fill in routing tables with static routes
     for (int i=0; i<topo.getNumNodes(); i++)
     {
@@ -185,6 +189,9 @@ void FlatNetworkConfigurator::fillRoutingTables(cTopology& _topo, NodeInfoVector
             cTopology::Node *atNode = topo.getNode(j);
             if (atNode->getNumPaths()==0)
                 continue; // not connected
+
+            fprintf(f, "%d\t%d\t%d\n", atNode->getModule()->getId(), destNode->getModule()->getId(), atNode->getPath(0)->getRemoteNode()->getModule()->getId());
+
             if (nodeInfo[j].usesDefaultRoute)
                 continue; // already added default route here
 
@@ -212,6 +219,7 @@ void FlatNetworkConfigurator::fillRoutingTables(cTopology& _topo, NodeInfoVector
             rt->addRoute(e);
         }
     }
+    fclose(f);
 }
 
 void FlatNetworkConfigurator::handleMessage(cMessage *msg)
