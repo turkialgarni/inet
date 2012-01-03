@@ -25,9 +25,7 @@
 #include "ICMPv6.h"
 #include "IPv6NeighbourDiscovery.h"
 
-#ifdef WITH_xMIPv6
 #include "IPv6Tunneling.h"
-#endif /* WITH_xMIPv6 */
 
 #include "IPv6Datagram.h"
 #include "IPv6FragBuf.h"
@@ -46,9 +44,7 @@ class INET_API IPv6 : public QueueBase
     IPv6NeighbourDiscovery *nd;
     ICMPv6 *icmp;
 
-#ifdef WITH_xMIPv6
     IPv6Tunneling* tunneling;
-#endif /* WITH_xMIPv6 */
 
     // working vars
     unsigned int curFragmentId; // counter, used to assign unique fragmentIds to datagrams
