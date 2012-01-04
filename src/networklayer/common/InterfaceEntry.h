@@ -35,6 +35,7 @@ class InterfaceProtocolData;
 class IPv4InterfaceData;
 class IPv6InterfaceData;
 
+//XXX what's this???
 class INET_API MacEstimateCostProcess
 {
 public:
