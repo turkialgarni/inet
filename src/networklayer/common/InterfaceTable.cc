@@ -26,6 +26,9 @@
 #include "InterfaceTable.h"
 #include "NotifierConsts.h"
 
+#ifdef WITH_IPv4
+#include "IPv4InterfaceData.h"
+#endif
 
 Define_Module( InterfaceTable );
 
@@ -221,6 +224,24 @@ void InterfaceTable::invalidateTmpInterfaceList()
 void InterfaceTable::interfaceChanged(InterfaceEntry *entry, int category)
 {
     nb->fireChangeNotification(category, entry);
+
+#ifdef WITH_IPv4
+    if (ev.isGUI()) {
+    	int outputGateId = entry->getNodeOutputGateId();
+    	if (outputGateId != -1 && entry->ipv4Data()) {
+    		cModule *host = getParentModule();
+    		cGate *outputGate = host->gate(outputGateId);
+    		if (outputGate->getChannel()) {
+    			char buf[32];
+    			sprintf(buf, "%s/%d", entry->ipv4Data()->getIPAddress().str().c_str(), entry->ipv4Data()->getNetmask().getNetmaskLength());
+    			cDisplayString& displayString = outputGate->getChannel()->getDisplayString();
+    			displayString.setTagArg("t", 0, buf);
+    			displayString.setTagArg("t", 1, "r");
+    		}
+    	}
+    }
+#endif
+
 }
 
 InterfaceEntry *InterfaceTable::getInterfaceByNodeOutputGateId(int id)
