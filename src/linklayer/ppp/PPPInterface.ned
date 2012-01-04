@@ -32,6 +32,7 @@ module PPPInterface like IWiredNic
 {
     parameters:
         @display("i=block/ifcard;bgb=214,249;bgl=53");
+        string inetAddress = default("");  // IPv4 or IPv6 address and prefix length, TODO docu
         string queueType = default("DropTailQueue"); // DropTailQueue, DropTailQoSQueue, REDQueue, or empty for use internal queue
         int numOutputHooks = default(0);
         int numInputHooks = default(0);

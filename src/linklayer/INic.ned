@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2000 Institut fuer Telematik, Universitaet Karlsruhe
+// Copyright (C) 2011 Andras Varga
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -21,11 +21,10 @@ package inet.linklayer;
 //
 // Prototype module for link layer protocols.
 //
-moduleinterface IWiredNic extends INic
+moduleinterface INic
 {
-    gates:
-        input netwIn;
-        output netwOut;
-        inout phys;
+    parameters:
+        @display("i=block/ifcard");
+        string inetAddress;  // IPv4 or IPv6 address, = default("10.?.?.?/?")
 }
 

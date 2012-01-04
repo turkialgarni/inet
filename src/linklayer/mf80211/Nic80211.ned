@@ -38,7 +38,7 @@ module Nic80211 like IWirelessNic
 {
     parameters:
         @display("i=block/ifcard");
-        string mgmtType = "";      // unused
+        string inetAddress = default("");  // IPv4 or IPv6 address and prefix length, TODO docu
     gates:
         input upperLayerIn @labels(Ieee802Ctrl); // to upper layers
         output upperLayerOut; // from upper layers

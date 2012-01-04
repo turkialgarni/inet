@@ -39,6 +39,7 @@ import inet.base.IHook;
 module Ieee80211NewNic like IWirelessNic
 {
     parameters:
+        string inetAddress = default("");  // IPv4 or IPv6 address and prefix length, TODO docu
         string mgmtType = default("Ieee80211MgmtSTA"); // name of the management module type (implements IIeee80211Mgmt)
         string opMode @enum("b","g","a","p") = default("g");
         int numOutputHooks = default(0);

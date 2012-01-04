@@ -46,7 +46,7 @@ import inet.linklayer.IWirelessNic;
 module NicCsma like IWirelessNic
 {
     parameters:
-        string mgmtType = ""; // unused
+        string inetAddress = default("");  // IPv4 or IPv6 address and prefix length, TODO docu
     gates:
         input upperLayerIn; // to upper layers
         output upperLayerOut; // from upper layers

@@ -32,6 +32,7 @@ module Ieee80211NicMesh like IWirelessNic
 {
     parameters:
         @display("i=block/ifcard");
+        string inetAddress = default("");  // IPv4 or IPv6 address and prefix length, TODO docu
         string mgmtType = "Ieee80211Mesh";
     gates:
         input upperLayerIn; // to upper layers

@@ -38,6 +38,7 @@ import inet.linklayer.IWirelessNic;
 module Ieee80211Nic like IWirelessNic
 {
     parameters:
+        string inetAddress = default("");  // IPv4 or IPv6 address and prefix length, TODO docu
         string mgmtType = default("Ieee80211MgmtSTA"); // name of the management module type (implements IIeee80211Mgmt)
         int numOutputHooks = default(0);
         int numInputHooks = default(0);
