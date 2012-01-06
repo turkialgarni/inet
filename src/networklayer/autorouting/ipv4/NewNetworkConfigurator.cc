@@ -100,14 +100,17 @@ void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo
     {
         // neighbor is a host or router, just add the interface
         InterfaceEntry *neighborIe = neighborIft->getInterfaceByNodeInputGateId(neighborInputGateId);
-        linkInfo.interfaces.push_back(InterfaceInfo(neighborIe));
-        interfacesSeen.insert(neighborIe);
+		if (interfacesSeen.count(neighborIe) == 0)  // "not yet seen"
+		{
+			linkInfo.interfaces.push_back(InterfaceInfo(neighborIe));
+			interfacesSeen.insert(neighborIe);
+		}
     }
     else
     {
         // assume that neighbor is an L2 or L1 device (bus/hub/switch/bridge/access point/etc); visit all its output links
         cTopology::Node *deviceNode = linkOut->getRemoteNode();
-        if (contains(deviceNodesVisited, deviceNode))
+        if (!contains(deviceNodesVisited, deviceNode))
         {
         	deviceNodesVisited.push_back(deviceNode);
         	for (int i = 0; i < deviceNode->getNumOutLinks(); i++)
