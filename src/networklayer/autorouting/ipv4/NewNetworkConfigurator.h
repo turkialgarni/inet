@@ -40,17 +40,32 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
         uint32 addressSpecifiedBits;
         IPv4Address netmask;
         uint32 netmaskSpecifiedBits;
-        InterfaceInfo(InterfaceEntry *ie) {entry = ie;}
+        InterfaceInfo(InterfaceEntry *ie) {
+            entry = ie;
+            // NOTE: default IP addresses are in the subnet 10.?.?.?/255.255.?.?
+            address = IPv4Address(0x0A000000);
+            addressSpecifiedBits = 0xFF000000;
+            netmask = IPv4Address(0xFFFF0000);
+            netmaskSpecifiedBits = 0xFFFF0000;
+        }
+    };
+    struct NodeInfo {
+        NodeInfo() {isIPNode = false; ift = NULL; rt = NULL; usesDefaultRoute = false;}
+        bool isIPNode;
+        IInterfaceTable *ift;
+        IRoutingTable *rt;
+        bool usesDefaultRoute;
     };
     struct LinkInfo {
         std::vector<InterfaceInfo*> interfaces;
-        ~LinkInfo() {/* TODO: delete */ }
+        ~LinkInfo() { for (int i = 0; i < interfaces.size(); i++) delete interfaces[i]; }
     };
     struct NetworkInfo {
+        std::map<cTopology::Node*, NodeInfo*> nodes;
         std::vector<LinkInfo*> links;
         std::vector<IPv4Address> addresses;
         std::vector<IPv4Address> netmasks;
-        ~NetworkInfo() {/* TODO: delete */ }
+        ~NetworkInfo() { for (int i = 0; i < links.size(); i++) delete links[i]; }
         void addAddressPrefix(IPv4Address address, IPv4Address netmask) { addresses.push_back(address); netmasks.push_back(netmask); }
         std::vector<IPv4Address>& getNetworkAddresses() { return addresses; }
         bool isUniqueAddressPrefix(IPv4Address address, IPv4Address netmask)
@@ -69,11 +84,14 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
     virtual void initialize(int stage);
     virtual void handleMessage(cMessage *msg);
 
-    virtual void extractTopology(cTopology& topo, LinkInfoVector& linkInfo);
-    virtual void visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo& linkInfo, std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& nodesVisited);
+    virtual void extractTopology(cTopology& topo, NetworkInfo& networkInfo);
+    virtual void visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo* linkInfo, std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& nodesVisited);
     void dump(const NetworkInfo& networkInfo);
 
     virtual void assignAddresses(cTopology& topo, NetworkInfo& networkInfo);
+    virtual void checkAddresses(cTopology& topo, NetworkInfo& networkInfo);
+    virtual void addDefaultRoutes(cTopology& topo, NetworkInfo& networkInfo);
+    virtual void fillRoutingTables(cTopology& topo, NetworkInfo& networkInfo);
 };
 
 #endif

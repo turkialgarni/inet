@@ -27,7 +27,6 @@
 
 Define_Module(NewNetworkConfigurator);
 
-
 void NewNetworkConfigurator::initialize(int stage)
 {
     if (stage==2)
@@ -37,10 +36,29 @@ void NewNetworkConfigurator::initialize(int stage)
 
         // extract topology into the cTopology object, then fill in a LinkInfo[] vector
         extractTopology(topo, networkInfo);
-        dump(networkInfo);
 
-        // assign addresses to IPv4 nodes, and also store result in nodeInfo[].address
+        // assign addresses to IPv4 nodes
         assignAddresses(topo, networkInfo);
+
+        // check IP address uniqueness over the network, and that all subnets live on a single link
+        checkAddresses(topo, networkInfo);
+
+        if (par("addStaticRoutes").boolValue()) {
+            // add default routes to hosts (nodes with a single attachment);
+            // also remember result in nodeInfo[].usesDefaultRoute
+            if (par("useDefaultRoutes").boolValue())
+                addDefaultRoutes(topo, networkInfo);
+
+            // calculate shortest paths, and add corresponding static routes
+            fillRoutingTables(topo, networkInfo);
+        }
+
+        // TODO: optimize routing tables based on the following operations:
+        // - check if two subsequent routes can be swapped
+        // - check if two subsequent routes complement each other
+        // - check if a route is covered by the following one
+
+        // dump(networkInfo);
     }
 }
 
@@ -58,6 +76,22 @@ void NewNetworkConfigurator::extractTopology(cTopology& topo, NetworkInfo& netwo
     topo.extractByProperty("node");
     EV << "cTopology found " << topo.getNumNodes() << " nodes\n";
 
+    // extract nodes, fill in isIPNode, ift and rt members in nodeInfo[]
+    for (int i=0; i<topo.getNumNodes(); i++)
+    {
+        cTopology::Node *node = topo.getNode(i);
+        cModule *mod = node->getModule();
+        NodeInfo *nodeInfo = new NodeInfo();
+        networkInfo.nodes[node] = nodeInfo;
+        nodeInfo->isIPNode = IPvXAddressResolver().findInterfaceTableOf(mod)!=NULL;
+        if (nodeInfo->isIPNode)
+        {
+            nodeInfo->ift = IPvXAddressResolver().interfaceTableOf(mod);
+            nodeInfo->rt = IPvXAddressResolver().routingTableOf(mod);
+        }
+    }
+
+    // extract links and interfaces
     std::set<InterfaceEntry*> interfacesSeen;
     for (int i = 0; i < topo.getNumNodes(); i++)
     {
@@ -137,14 +171,15 @@ void NewNetworkConfigurator::dump(const NetworkInfo& networkInfo)
 	for (int i = 0; i < networkInfo.links.size(); i++)
 	{
 		EV << "Link " << i << "\n";
-	    const LinkInfo& linkInfo = networkInfo.links[i];
-		for (int j = 0; j < linkInfo.interfaces.size(); j++)
+	    const LinkInfo* linkInfo = networkInfo.links[i];
+		for (int j = 0; j < linkInfo->interfaces.size(); j++)
 		{
-			const InterfaceEntry *ie = linkInfo.interfaces[j].entry;
+			const InterfaceEntry *ie = linkInfo->interfaces[j]->entry;
 			cModule *host = dynamic_cast<cModule *>(ie->getInterfaceTable())->getParentModule();
-			EV << "    " << host->getFullName() << " / " << ie->getName() << "\n";
+			EV << "    " << host->getFullName() << " / " << ie->getName() << " " << ie->info() << "\n";
 		}
 	}
+}
 
 void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& networkInfo)
 {
@@ -170,7 +205,6 @@ void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& netwo
             uint32 mergedNetmaskIncompatibleBits = 0;
             for (int unconfiguredInterfaceIndex = 0; unconfiguredInterfaceIndex < unconfiguredInterfaces.size(); unconfiguredInterfaceIndex++) {
                 InterfaceInfo *candidateInterface = unconfiguredInterfaces.at(unconfiguredInterfaceIndex);
-//                System.out.println();
                 // extract candidate data
                 uint32 candidateAddress = candidateInterface->address.getInt();
                 uint32 candidateAddressSpecifiedBits = candidateInterface->addressSpecifiedBits;
@@ -247,7 +281,6 @@ void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& netwo
                 uint32 max = 0;
                 for (int addressIndex = 0; addressIndex < networkInfo.getNetworkAddresses().size(); addressIndex++) {
                     uint32 addressPrefix = networkInfo.getNetworkAddresses().at(addressIndex).getInt();
-                    // TODO: signed integer > sux here
                     if ((addressPrefix & networkAddressUnspecifiedBits) > max)
                         max = addressPrefix & networkAddressUnspecifiedBits;
                 }
@@ -276,7 +309,6 @@ void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& netwo
                 uint32 max = 0;
                 for (int otherInterfaceIndex = 0; otherInterfaceIndex < interfaceIndex; otherInterfaceIndex++) {
                     uint32 otherInterfaceAddress = compatibleInterfaces.at(otherInterfaceIndex)->address.getInt();
-                    // TODO: signed integer > sux here
                     if ((otherInterfaceAddress & interfaceAddressUnspecifiedBits) > max)
                         max = otherInterfaceAddress & interfaceAddressUnspecifiedBits;
                 }
@@ -286,14 +318,147 @@ void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& netwo
                 // configure interface
                 // TODO: we should not create a new one here
                 IPv4InterfaceData *interfaceData = new IPv4InterfaceData();
-                interfaceData->setIPAddress(IPv4Address(networkAddress | interfaceAddress));
-                interfaceData->setNetmask(IPv4Address(networkNetmask));
+                IPv4Address address = IPv4Address(networkAddress | interfaceAddress);
+                IPv4Address netmask = IPv4Address(networkNetmask);
+                interfaceData->setIPAddress(address);
+                interfaceData->setNetmask(netmask);
+                compatibleInterface->address = address;
                 compatibleInterface->entry->setIPv4Data(interfaceData);
                 // remove configured interface
                 unconfiguredInterfaces.erase(find(unconfiguredInterfaces, compatibleInterface));
             }
             // register the network address and netmask as being used
             networkInfo.addAddressPrefix(IPv4Address(networkAddress), IPv4Address(networkNetmask));
+        }
+    }
+}
+
+void NewNetworkConfigurator::checkAddresses(cTopology& topo, NetworkInfo& networkInfo)
+{
+    std::map<IPv4Address, InterfaceEntry *> addresses;
+    for (int linkIndex = 0; linkIndex < networkInfo.links.size(); linkIndex++) {
+        LinkInfo *selectedLink = networkInfo.links.at(linkIndex);
+        for (int interfaceIndex = 0; interfaceIndex < selectedLink->interfaces.size(); interfaceIndex++) {
+            InterfaceInfo *selectedInterface = selectedLink->interfaces.at(interfaceIndex);
+            IPv4Address address = selectedInterface->entry->ipv4Data()->getIPAddress();
+            if (addresses.find(address) != addresses.end())
+                error("failed to configure unique IP addresses");
+            addresses[address] = selectedInterface->entry;
+        }
+    }
+    // TODO: check that all subnets live on a single link
+}
+
+void NewNetworkConfigurator::addDefaultRoutes(cTopology& topo, NetworkInfo& networkInfo)
+{
+    // add default route to nodes with exactly one (non-loopback) interface
+    std::map<cTopology::Node*, NodeInfo*>& nodes = networkInfo.nodes;
+    for (int i=0; i<topo.getNumNodes(); i++)
+    {
+        cTopology::Node *node = topo.getNode(i);
+        NodeInfo *nodeInfo = networkInfo.nodes[node];
+
+        // skip bus types
+        if (!nodeInfo->isIPNode)
+            continue;
+
+        IInterfaceTable *ift = nodeInfo->ift;
+        IRoutingTable *rt = nodeInfo->rt;
+
+        // count non-loopback interfaces
+        int numIntf = 0;
+        InterfaceEntry *ie = NULL;
+        for (int k=0; k<ift->getNumInterfaces(); k++)
+            if (!ift->getInterface(k)->isLoopback())
+                {ie = ift->getInterface(k); numIntf++;}
+
+        nodeInfo->usesDefaultRoute = (numIntf==1);
+        if (numIntf!=1)
+            continue; // only deal with nodes with one interface plus loopback
+
+        EV << "  " << node->getModule()->getFullName() << " has only one (non-loopback) interface, adding default route\n";
+
+        // NOTE: we don't specify the gateway in the default route which may result in extra ARP requests
+        IPv4Route *route = new IPv4Route();
+        route->setHost(IPv4Address());
+        route->setNetmask(IPv4Address());
+        route->setInterface(ie);
+        route->setType(IPv4Route::REMOTE);
+        route->setSource(IPv4Route::MANUAL);
+        rt->addRoute(route);
+    }
+}
+
+void NewNetworkConfigurator::fillRoutingTables(cTopology& topo, NetworkInfo& networkInfo)
+{
+    // fill in routing tables with static routes
+    for (int i=0; i<topo.getNumNodes(); i++)
+    {
+        cTopology::Node *destNode = topo.getNode(i);
+        NodeInfo *destNodeInfo = networkInfo.nodes[destNode];
+
+        // skip bus types
+        if (!destNodeInfo->isIPNode)
+            continue;
+
+        std::string destModName = destNode->getModule()->getFullName();
+        IInterfaceTable *destIFT = destNodeInfo->ift;
+
+        // calculate shortest paths from everywhere towards destNode
+        topo.calculateUnweightedSingleShortestPathsTo(destNode);
+
+        // add route (with host=destNode) to every routing table in the network
+        // (excepting nodes with only one interface -- there we'll set up a default route)
+        for (int j=0; j<topo.getNumNodes(); j++)
+        {
+            cTopology::Node *sourceNode = topo.getNode(j);
+            NodeInfo *sourceNodeInfo = networkInfo.nodes[sourceNode];
+
+            if (i==j || !sourceNodeInfo->isIPNode)
+                continue;
+            if (sourceNode->getNumPaths()==0)
+                continue; // not connected
+            if (sourceNodeInfo->usesDefaultRoute)
+                continue; // already added default route here
+
+            // find source output interface
+            IInterfaceTable *sourceIFT = sourceNodeInfo->ift;
+            int sourceGateId = sourceNode->getPath(0)->getLocalGateId();
+            InterfaceEntry *sourceInterface = sourceIFT->getInterfaceByNodeOutputGateId(sourceGateId);
+            ASSERT(sourceInterface);
+
+            // find next hop input interface
+            cTopology::LinkOut *link = sourceNode->getPath(0);
+            while (!networkInfo.nodes[link->getRemoteNode()]->isIPNode)
+                link = link->getRemoteNode()->getPath(0);
+
+            IInterfaceTable *nextHopIFT = networkInfo.nodes[link->getRemoteNode()]->ift;
+            int nextHopGateId = link->getRemoteGateId();
+            InterfaceEntry *nextHopInterface = nextHopIFT->getInterfaceByNodeInputGateId(nextHopGateId);
+            ASSERT(nextHopInterface);
+
+            // find destination input interface
+            link = sourceNode->getPath(0);
+            while (link->getRemoteNode() != destNode)
+                link = link->getRemoteNode()->getPath(0);
+
+            int destGateId = link->getRemoteGateId();
+            InterfaceEntry *destInterface = destIFT->getInterfaceByNodeInputGateId(destGateId);
+            ASSERT(destInterface);
+
+            // add route
+            IRoutingTable *rt = sourceNodeInfo->rt;
+            IPv4Route *route = new IPv4Route();
+            IPv4InterfaceData *ipv4Data = destInterface->ipv4Data();
+            route->setHost(IPv4Address(ipv4Data->getIPAddress().getInt() & ipv4Data->getNetmask().getInt()));
+            route->setNetmask(ipv4Data->getNetmask());
+            route->setInterface(sourceInterface);
+            route->setGateway(nextHopInterface->ipv4Data()->getIPAddress());
+            route->setType(IPv4Route::DIRECT);
+            route->setSource(IPv4Route::MANUAL);
+            rt->addRoute(route);
+
+            EV << sourceNode->getModule()->getFullName() << " -> " << destNode->getModule()->getFullName() << "   " << route->info() << endl;
         }
     }
 }
