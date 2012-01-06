@@ -20,6 +20,7 @@
 #include <sstream>
 
 #include "IPv4Route.h"
+#include "IPv4InterfaceData.h"
 
 #include "InterfaceEntry.h"
 #include "IRoutingTable.h"
@@ -42,8 +43,9 @@ std::string IPv4Route::info() const
     out << "gw:"; if (gateway.isUnspecified()) out << "*  "; else out << gateway << "  ";
     out << "mask:"; if (netmask.isUnspecified()) out << "*  "; else out << netmask << "  ";
     out << "metric:" << metric << " ";
-    out << "if:"; if (!interfacePtr) out << "*  "; else out << interfacePtr->getName() << "  ";
+    out << "if:"; if (!interfacePtr) out << "*  "; else out << interfacePtr->getName() << "(" << interfacePtr->ipv4Data()->getIPAddress() << ")  ";
     out << (type==DIRECT ? "DIRECT" : "REMOTE");
+
 
     switch (source)
     {
