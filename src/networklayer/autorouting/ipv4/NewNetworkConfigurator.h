@@ -35,13 +35,34 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
 {
   protected:
     struct InterfaceInfo {
-    	InterfaceInfo(InterfaceEntry *ie) {entry = ie;}
-    	InterfaceEntry *entry;
+        InterfaceEntry *entry;
+        IPv4Address address;
+        uint32 addressSpecifiedBits;
+        IPv4Address netmask;
+        uint32 netmaskSpecifiedBits;
+        InterfaceInfo(InterfaceEntry *ie) {entry = ie;}
     };
     struct LinkInfo {
-    	std::vector<InterfaceInfo> interfaces;
+        std::vector<InterfaceInfo*> interfaces;
+        ~LinkInfo() {/* TODO: delete */ }
     };
-    typedef std::vector<LinkInfo> LinkInfoVector;
+    struct NetworkInfo {
+        std::vector<LinkInfo*> links;
+        std::vector<IPv4Address> addresses;
+        std::vector<IPv4Address> netmasks;
+        ~NetworkInfo() {/* TODO: delete */ }
+        void addAddressPrefix(IPv4Address address, IPv4Address netmask) { addresses.push_back(address); netmasks.push_back(netmask); }
+        std::vector<IPv4Address>& getNetworkAddresses() { return addresses; }
+        bool isUniqueAddressPrefix(IPv4Address address, IPv4Address netmask)
+        {
+            for (int i = 0; i < addresses.size(); i++) {
+                int commonNetmask = netmasks.at(i).getInt() & netmask.getInt();
+                if ((addresses.at(i).getInt() & commonNetmask) == (address.getInt() & commonNetmask))
+                    return false;
+            }
+            return true;
+        }
+    };
 
   protected:
     virtual int numInitStages() const  {return 3;}
@@ -50,7 +71,9 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
 
     virtual void extractTopology(cTopology& topo, LinkInfoVector& linkInfo);
     virtual void visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo& linkInfo, std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& nodesVisited);
-    void dump(const LinkInfoVector& linkInfoVector);
+    void dump(const NetworkInfo& networkInfo);
+
+    virtual void assignAddresses(cTopology& topo, NetworkInfo& networkInfo);
 };
 
 #endif

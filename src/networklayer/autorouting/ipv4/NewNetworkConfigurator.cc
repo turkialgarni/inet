@@ -33,12 +33,14 @@ void NewNetworkConfigurator::initialize(int stage)
     if (stage==2)
     {
         cTopology topo("topo");
-        LinkInfoVector linkInfoVector;
+        NetworkInfo networkInfo;
 
         // extract topology into the cTopology object, then fill in a LinkInfo[] vector
-        extractTopology(topo, linkInfoVector);
+        extractTopology(topo, networkInfo);
+        dump(networkInfo);
 
-        dump(linkInfoVector);
+        // assign addresses to IPv4 nodes, and also store result in nodeInfo[].address
+        assignAddresses(topo, networkInfo);
     }
 }
 
@@ -50,7 +52,7 @@ static cTopology::LinkOut *findLinkOut(cTopology::Node *node, int gateId)
 	return NULL;
 }
 
-void NewNetworkConfigurator::extractTopology(cTopology& topo, LinkInfoVector& linkInfoVector)
+void NewNetworkConfigurator::extractTopology(cTopology& topo, NetworkInfo& networkInfo)
 {
     // extract topology
     topo.extractByProperty("node");
@@ -69,9 +71,9 @@ void NewNetworkConfigurator::extractTopology(cTopology& topo, LinkInfoVector& li
     			if (!ie->isLoopback() && interfacesSeen.count(ie) == 0)  // "not yet seen"
     			{
     				// store interface as belonging to a new network link
-			        linkInfoVector.push_back(LinkInfo());
-			        LinkInfo& linkInfo = linkInfoVector.back();
-			        linkInfo.interfaces.push_back(InterfaceInfo(ie));
+			        networkInfo.links.push_back(new LinkInfo());
+			        LinkInfo* linkInfo = networkInfo.links.back();
+			        linkInfo->interfaces.push_back(new InterfaceInfo(ie));
     				interfacesSeen.insert(ie);
 
     				// visit neighbor (and potentially the whole LAN, recursively)
@@ -88,9 +90,12 @@ void NewNetworkConfigurator::extractTopology(cTopology& topo, LinkInfoVector& li
 }
 
 template<typename T>
-inline bool contains(std::vector<T> v, T& a) {return std::find(v.begin(), v.end(), a) != v.end();}
+inline typename std::vector<T>::iterator find(std::vector<T>& v, T& a) {return std::find(v.begin(), v.end(), a);}
 
-void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo& linkInfo,
+template<typename T>
+inline bool contains(std::vector<T>& v, T& a) {return find(v, a) != v.end();}
+
+void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo* linkInfo,
 		std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& deviceNodesVisited)
 {
     cModule *neighborMod = linkOut->getRemoteNode()->getModule();
@@ -102,8 +107,8 @@ void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo
         InterfaceEntry *neighborIe = neighborIft->getInterfaceByNodeInputGateId(neighborInputGateId);
 		if (interfacesSeen.count(neighborIe) == 0)  // "not yet seen"
 		{
-			linkInfo.interfaces.push_back(InterfaceInfo(neighborIe));
-			interfacesSeen.insert(neighborIe);
+	        linkInfo->interfaces.push_back(new InterfaceInfo(neighborIe));
+	        interfacesSeen.insert(neighborIe);
 		}
     }
     else
@@ -122,18 +127,17 @@ void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo
     }
 }
 
-
 void NewNetworkConfigurator::handleMessage(cMessage *msg)
 {
     error("this module doesn't handle messages, it runs only in initialize()");
 }
 
-void NewNetworkConfigurator::dump(const LinkInfoVector& linkInfoVector)
+void NewNetworkConfigurator::dump(const NetworkInfo& networkInfo)
 {
-	for (int i = 0; i < linkInfoVector.size(); i++)
+	for (int i = 0; i < networkInfo.links.size(); i++)
 	{
 		EV << "Link " << i << "\n";
-	    const LinkInfo& linkInfo = linkInfoVector[i];
+	    const LinkInfo& linkInfo = networkInfo.links[i];
 		for (int j = 0; j < linkInfo.interfaces.size(); j++)
 		{
 			const InterfaceEntry *ie = linkInfo.interfaces[j].entry;
@@ -141,4 +145,155 @@ void NewNetworkConfigurator::dump(const LinkInfoVector& linkInfoVector)
 			EV << "    " << host->getFullName() << " / " << ie->getName() << "\n";
 		}
 	}
+
+void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& networkInfo)
+{
+    // iterate through all links and assign addresses
+    for (int linkIndex = 0; linkIndex < networkInfo.links.size(); linkIndex++) {
+        LinkInfo *selectedLink = networkInfo.links.at(linkIndex);
+        // repeat until all interfaces of the selected link become configured
+        std::vector<InterfaceInfo*> unconfiguredInterfaces = selectedLink->interfaces;
+        while (unconfiguredInterfaces.size() != 0) {
+            std::vector<InterfaceInfo*> compatibleInterfaces;
+            // find a subset of the unconfigured interfaces that have compatible address and netmask specifications.
+            // determine the merged address and netmask specifications according to the following table.
+            // the '?' symbol means the bit is unspecified, the 'X' symbol means the bit is incompatible.
+            // | * | 0 | 1 | ? |
+            // | 0 | 0 | X | 0 |
+            // | 1 | X | 1 | 1 |
+            // | ? | 0 | 1 | ? |
+            uint32 mergedAddress = 0;
+            uint32 mergedAddressSpecifiedBits = 0;
+            uint32 mergedAddressIncompatibleBits = 0;
+            uint32 mergedNetmask = 0;
+            uint32 mergedNetmaskSpecifiedBits = 0;
+            uint32 mergedNetmaskIncompatibleBits = 0;
+            for (int unconfiguredInterfaceIndex = 0; unconfiguredInterfaceIndex < unconfiguredInterfaces.size(); unconfiguredInterfaceIndex++) {
+                InterfaceInfo *candidateInterface = unconfiguredInterfaces.at(unconfiguredInterfaceIndex);
+//                System.out.println();
+                // extract candidate data
+                uint32 candidateAddress = candidateInterface->address.getInt();
+                uint32 candidateAddressSpecifiedBits = candidateInterface->addressSpecifiedBits;
+                uint32 candidateNetmask = candidateInterface->netmask.getInt();
+                uint32 candidateNetmaskSpecifiedBits = candidateInterface->netmaskSpecifiedBits;
+//                System.out.println("Trying to merge candidate address: " + new IPAddress(candidateAddress) + " / " + new IPAddress(candidateAddressSpecifiedBits));
+//                System.out.println("Trying to merge candidate netmask: " + new IPAddress(candidateNetmask) + " / " + new IPAddress(candidateNetmaskSpecifiedBits));
+                // determine merged netmask
+                uint32 commonNetmaskSpecifiedBits = mergedNetmaskSpecifiedBits & candidateNetmaskSpecifiedBits;
+                uint32 newMergedNetmask = mergedNetmask | (candidateNetmask & candidateNetmaskSpecifiedBits);
+                uint32 newMergedNetmaskSpecifiedBits = mergedNetmaskSpecifiedBits | candidateNetmaskSpecifiedBits;
+                uint32 newMergedNetmaskIncompatibleBits = mergedNetmaskIncompatibleBits | ((mergedNetmask & commonNetmaskSpecifiedBits) ^ (candidateNetmask & commonNetmaskSpecifiedBits));
+                // skip interface if there's a bit where the netmasks are incompatible
+                if (newMergedNetmaskIncompatibleBits != 0)
+                    continue;
+                // determine merged address
+                uint32 commonAddressSpecifiedBits = mergedAddressSpecifiedBits & candidateAddressSpecifiedBits;
+                uint32 newMergedAddress = mergedAddress | (candidateAddress & candidateAddressSpecifiedBits);
+                uint32 newMergedAddressSpecifiedBits = mergedAddressSpecifiedBits | candidateAddressSpecifiedBits;
+                uint32 newMergedAddressIncompatibleBits = mergedAddressIncompatibleBits | ((mergedAddress & commonAddressSpecifiedBits) ^ (candidateAddress & commonAddressSpecifiedBits));
+                // skip interface if there's a bit where the netmask is 1 and the addresses are incompatible
+                if ((newMergedNetmask & newMergedNetmaskSpecifiedBits & newMergedAddressIncompatibleBits) != 0)
+                    continue;
+                // skip interface if there's a bit where the address is specified, incompatible and the netmask is 1
+                // TODO: do we really need to & newMergedNetmask & newMergedNetmaskSpecifiedBits?????
+                if ((newMergedAddressSpecifiedBits & newMergedAddressIncompatibleBits & newMergedNetmask & newMergedNetmaskSpecifiedBits) != 0)
+                    continue;
+                // add interface to the list of compatible interfaces
+                compatibleInterfaces.push_back(candidateInterface);
+                mergedAddress = newMergedAddress;
+                mergedAddressSpecifiedBits = newMergedAddressSpecifiedBits;
+                mergedAddressIncompatibleBits = newMergedAddressIncompatibleBits;
+                mergedNetmask = newMergedNetmask;
+                mergedNetmaskSpecifiedBits = newMergedNetmaskSpecifiedBits;
+                mergedNetmaskIncompatibleBits = newMergedNetmaskIncompatibleBits;
+//                System.out.println("Merged address specification: " + new IPAddress(mergedAddress) + " / " + new IPAddress(mergedAddressSpecifiedBits) + " / " + new IPAddress(mergedAddressIncompatibleBits));
+//                System.out.println("Merged netmask specification: " + new IPAddress(mergedNetmask) + " / " + new IPAddress(mergedNetmaskSpecifiedBits) + " / " + new IPAddress(mergedNetmaskIncompatibleBits));
+            }
+//            System.out.println("Found " + compatibleInterfaces.size() + " compatible interfaces");
+            // determine the valid range of netmask length
+            int minNetmaskLength = 0;
+            int maxNetmaskLength = 32;
+            for (int bitIndex = 31; bitIndex >= 0; bitIndex--) {
+                uint32 mask = 1 << bitIndex;
+                if ((mergedNetmaskSpecifiedBits & mask) != 0) {
+                    if ((mergedNetmask & mask) != 0)
+                        minNetmaskLength = std::max(minNetmaskLength, 32 - bitIndex);
+                    else
+                        maxNetmaskLength = std::min(maxNetmaskLength, 31 - bitIndex);
+                }
+                if ((mergedAddressIncompatibleBits & mask) != 0)
+                    maxNetmaskLength = std::min(maxNetmaskLength, 31 - bitIndex);
+            }
+            // make sure there are enough bits to configure a unique address for all interface (+ 2 means that all 1 and all 0 addresses are ruled out)
+            int interfaceAddressBitCount = (int)std::ceil(std::log((double)(compatibleInterfaces.size() + 2)) / std::log((double)2));
+            maxNetmaskLength = std::min(maxNetmaskLength, 32 - interfaceAddressBitCount);
+//            System.out.println("Netmask valid length range: " + minNetmaskLength + " - " + maxNetmaskLength);
+            // determine network address and network netmask
+            int netmaskLength;
+            uint32 networkAddress = 0;
+            uint32 networkNetmask = 0;
+            for (netmaskLength = maxNetmaskLength; netmaskLength >= minNetmaskLength; netmaskLength--) {
+                networkNetmask = ((1 << netmaskLength) - 1) << (32 - netmaskLength);
+                networkAddress = mergedAddress & mergedAddressSpecifiedBits & networkNetmask;
+                uint32 networkAddressUnspecifiedBits = ~mergedAddressSpecifiedBits & networkNetmask;
+                // TODO: for the sake of simplicity we assume a continuous range of unspecified bits
+                //       otherwise we would have to add 1 to the max value in an integer where bits are scattered
+                int last1BitIndex = 0;
+                for (int bitIndex = 31; bitIndex >= 0; bitIndex--) {
+                    uint32 mask = 1 << bitIndex;
+                    if ((networkAddressUnspecifiedBits & mask) != 0)
+                        last1BitIndex = bitIndex;
+                }
+                uint32 max = 0;
+                for (int addressIndex = 0; addressIndex < networkInfo.getNetworkAddresses().size(); addressIndex++) {
+                    uint32 addressPrefix = networkInfo.getNetworkAddresses().at(addressIndex).getInt();
+                    // TODO: signed integer > sux here
+                    if ((addressPrefix & networkAddressUnspecifiedBits) > max)
+                        max = addressPrefix & networkAddressUnspecifiedBits;
+                }
+                uint32 increment = networkInfo.getNetworkAddresses().size() == 0 ? 0 : 1 << last1BitIndex;
+                networkAddress |= (max + increment) & networkAddressUnspecifiedBits;
+                if (networkInfo.isUniqueAddressPrefix(IPv4Address(networkAddress), IPv4Address(networkNetmask)))
+                    break;
+            }
+//            System.out.println("Selected netmask length: " + netmaskLength);
+//            System.out.println("Selected network address: " + new IPAddress(networkAddress));
+//            System.out.println("Selected network netmask: " + new IPAddress(networkNetmask));
+            // determine addresses for all interfaces
+            for (int interfaceIndex = 0; interfaceIndex < compatibleInterfaces.size(); interfaceIndex++) {
+                InterfaceInfo *compatibleInterface = compatibleInterfaces.at(interfaceIndex);
+                uint32 interfaceAddress = compatibleInterface->address.getInt();
+                uint32 interfaceAddressSpecifiedBits = compatibleInterface->addressSpecifiedBits;
+                uint32 interfaceAddressUnspecifiedBits = ~interfaceAddressSpecifiedBits & ~networkNetmask;
+                // TODO: for the sake of simplicity we assume a continuous range of unspecified bits
+                //       otherwise we would have to add 1 to the max value in an integer where bits are scattered
+                int last1BitIndex = 0;
+                for (int bitIndex = 31; bitIndex >= 0; bitIndex--) {
+                    uint32 mask = 1 << bitIndex;
+                    if ((interfaceAddressUnspecifiedBits & mask) != 0)
+                        last1BitIndex = bitIndex;
+                }
+                uint32 max = 0;
+                for (int otherInterfaceIndex = 0; otherInterfaceIndex < interfaceIndex; otherInterfaceIndex++) {
+                    uint32 otherInterfaceAddress = compatibleInterfaces.at(otherInterfaceIndex)->address.getInt();
+                    // TODO: signed integer > sux here
+                    if ((otherInterfaceAddress & interfaceAddressUnspecifiedBits) > max)
+                        max = otherInterfaceAddress & interfaceAddressUnspecifiedBits;
+                }
+                // start from 1 to avoid all 0 addresses
+                uint32 increment = interfaceIndex == 0 ? 1 : 1 << last1BitIndex;
+                interfaceAddress = (interfaceAddress & ~networkNetmask) | (max + increment) & interfaceAddressUnspecifiedBits;
+                // configure interface
+                // TODO: we should not create a new one here
+                IPv4InterfaceData *interfaceData = new IPv4InterfaceData();
+                interfaceData->setIPAddress(IPv4Address(networkAddress | interfaceAddress));
+                interfaceData->setNetmask(IPv4Address(networkNetmask));
+                compatibleInterface->entry->setIPv4Data(interfaceData);
+                // remove configured interface
+                unconfiguredInterfaces.erase(find(unconfiguredInterfaces, compatibleInterface));
+            }
+            // register the network address and netmask as being used
+            networkInfo.addAddressPrefix(IPv4Address(networkAddress), IPv4Address(networkNetmask));
+        }
+    }
 }
