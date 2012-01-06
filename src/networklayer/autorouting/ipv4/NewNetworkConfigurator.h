@@ -39,8 +39,7 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
     	InterfaceEntry *entry;
     };
     struct LinkInfo {
-    	std::vector<InterfaceInfo*> interfaces;
-    	~LinkInfo() {/*TODO delete interfaceinfos*/}
+    	std::vector<InterfaceInfo> interfaces;
     };
     typedef std::vector<LinkInfo> LinkInfoVector;
 
@@ -51,6 +50,7 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
 
     virtual void extractTopology(cTopology& topo, LinkInfoVector& linkInfo);
     virtual void visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo& linkInfo, std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& nodesVisited);
+    void dump(const LinkInfoVector& linkInfoVector);
 };
 
 #endif

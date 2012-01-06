@@ -33,10 +33,12 @@ void NewNetworkConfigurator::initialize(int stage)
     if (stage==2)
     {
         cTopology topo("topo");
-        LinkInfoVector linkInfo;
+        LinkInfoVector linkInfoVector;
 
         // extract topology into the cTopology object, then fill in a LinkInfo[] vector
-        extractTopology(topo, linkInfo);
+        extractTopology(topo, linkInfoVector);
+
+        dump(linkInfoVector);
     }
 }
 
@@ -64,12 +66,12 @@ void NewNetworkConfigurator::extractTopology(cTopology& topo, LinkInfoVector& li
     		for (int j = 0; j < ift->getNumInterfaces(); j++)
     		{
     			InterfaceEntry *ie = ift->getInterface(j);
-    			if (interfacesSeen.count(ie) == 0)  // "not yet seen"
+    			if (!ie->isLoopback() && interfacesSeen.count(ie) == 0)  // "not yet seen"
     			{
     				// store interface as belonging to a new network link
 			        linkInfoVector.push_back(LinkInfo());
 			        LinkInfo& linkInfo = linkInfoVector.back();
-			        linkInfo.interfaces.push_back(new InterfaceInfo(ie));
+			        linkInfo.interfaces.push_back(InterfaceInfo(ie));
     				interfacesSeen.insert(ie);
 
     				// visit neighbor (and potentially the whole LAN, recursively)
@@ -98,7 +100,7 @@ void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo
     {
         // neighbor is a host or router, just add the interface
         InterfaceEntry *neighborIe = neighborIft->getInterfaceByNodeInputGateId(neighborInputGateId);
-        linkInfo.interfaces.push_back(new InterfaceInfo(neighborIe));
+        linkInfo.interfaces.push_back(InterfaceInfo(neighborIe));
         interfacesSeen.insert(neighborIe);
     }
     else
@@ -123,3 +125,17 @@ void NewNetworkConfigurator::handleMessage(cMessage *msg)
     error("this module doesn't handle messages, it runs only in initialize()");
 }
 
+void NewNetworkConfigurator::dump(const LinkInfoVector& linkInfoVector)
+{
+	for (int i = 0; i < linkInfoVector.size(); i++)
+	{
+		EV << "Link " << i << "\n";
+	    const LinkInfo& linkInfo = linkInfoVector[i];
+		for (int j = 0; j < linkInfo.interfaces.size(); j++)
+		{
+			const InterfaceEntry *ie = linkInfo.interfaces[j].entry;
+			cModule *host = dynamic_cast<cModule *>(ie->getInterfaceTable())->getParentModule();
+			EV << "    " << host->getFullName() << " / " << ie->getName() << "\n";
+		}
+	}
+}

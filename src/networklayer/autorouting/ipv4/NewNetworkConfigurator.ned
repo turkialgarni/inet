@@ -19,6 +19,8 @@
 package inet.networklayer.autorouting.ipv4;
 
 //
+// FIXME actualize!!!!
+//
 // Configures IPv4 addresses and routing tables for a "flat" network,
 // "flat" meaning that all hosts and routers will have the same
 // network address and will only differ in the host part.
@@ -57,11 +59,9 @@ package inet.networklayer.autorouting.ipv4;
 // interfaces register themselves in the ~InterfaceTable modules, and
 // in stage 1, routing files are read.)
 //
-simple FlatNetworkConfigurator
+simple NewNetworkConfigurator
 {
     parameters:
-        string networkAddress = default("192.168.0.0"); // network part of the address (see netmask parameter)
-        string netmask = default("255.255.0.0"); // host part of addresses are autoconfigured
         @display("i=block/cogwheel_s");
 }
 
