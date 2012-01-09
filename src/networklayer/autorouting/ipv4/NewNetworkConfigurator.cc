@@ -124,10 +124,13 @@ void NewNetworkConfigurator::extractTopology(cTopology& topo, NetworkInfo& netwo
 }
 
 template<typename T>
-inline typename std::vector<T>::iterator find(std::vector<T>& v, T& a) {return std::find(v.begin(), v.end(), a);}
+typename std::vector<T>::iterator find(std::vector<T>& v, T& a) {return std::find(v.begin(), v.end(), a);}
 
 template<typename T>
-inline bool contains(std::vector<T>& v, T& a) {return find(v, a) != v.end();}
+typename std::vector<T>::const_iterator find(const std::vector<T>& v, T& a) {return std::find(v.begin(), v.end(), a);}
+
+template<typename T>
+inline bool contains(const std::vector<T>& v, T& a) {return find(v, a) != v.end();}
 
 void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo* linkInfo,
 		std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& deviceNodesVisited)
@@ -179,6 +182,15 @@ void NewNetworkConfigurator::dump(const NetworkInfo& networkInfo)
 			EV << "    " << host->getFullName() << " / " << ie->getName() << " " << ie->info() << "\n";
 		}
 	}
+}
+
+// how many bits are needed to represent x
+inline int bitCount(unsigned int x)
+{
+    int n = 0;
+    while ((1<<n) <= x)
+        n++;
+    return n;
 }
 
 void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& networkInfo)
@@ -258,8 +270,8 @@ void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& netwo
                 if ((mergedAddressIncompatibleBits & mask) != 0)
                     maxNetmaskLength = std::min(maxNetmaskLength, 31 - bitIndex);
             }
-            // make sure there are enough bits to configure a unique address for all interface (+ 2 means that all 1 and all 0 addresses are ruled out)
-            int interfaceAddressBitCount = (int)std::ceil(std::log((double)(compatibleInterfaces.size() + 2)) / std::log((double)2));
+            // make sure there are enough bits to configure a unique address for all interface (+ 2 means that the all-zeroes and all-ones addresses are ruled out)
+            int interfaceAddressBitCount = bitCount(compatibleInterfaces.size() + 2);
             maxNetmaskLength = std::min(maxNetmaskLength, 32 - interfaceAddressBitCount);
 //            System.out.println("Netmask valid length range: " + minNetmaskLength + " - " + maxNetmaskLength);
             // determine network address and network netmask
