@@ -100,6 +100,11 @@ void InterfaceTable::receiveChangeNotification(int category, const cObject *deta
 
 //---
 
+cModule *InterfaceTable::getHostModule()
+{
+    return findContainingNode(this);
+}
+
 int InterfaceTable::getNumInterfaces()
 {
     if (tmpNumInterfaces == -1)
