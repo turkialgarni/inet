@@ -23,6 +23,7 @@
 #include "NewNetworkConfigurator.h"
 #include "InterfaceEntry.h"
 #include "IPv4InterfaceData.h"
+#include "PatternMatcher.h"
 
 
 Define_Module(NewNetworkConfigurator);
@@ -36,6 +37,9 @@ void NewNetworkConfigurator::initialize(int stage)
 
         // extract topology into the cTopology object, then fill in a LinkInfo[] vector
         extractTopology(topo, networkInfo);
+
+        // read the configuration from XML; it will serve as input for address assignment
+        readAddressConfiguration(par("config").xmlValue(), topo, networkInfo);
 
         // assign addresses to IPv4 nodes
         assignAddresses(topo, networkInfo);
@@ -162,6 +166,104 @@ void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo
         	}
         }
     }
+}
+
+class Matcher
+{
+    private:
+        std::vector<inet::PatternMatcher*> matchers; // TODO replace with a MatchExpression once it becomes available in OMNeT++
+    public:
+        Matcher(const char *pattern);
+        ~Matcher();
+        bool matches(const char *s);
+};
+
+Matcher::Matcher(const char *pattern)
+{
+    cStringTokenizer tokenizer(pattern);
+    while (tokenizer.hasMoreTokens())
+        matchers.push_back(new inet::PatternMatcher(tokenizer.nextToken(), true, true, true));
+}
+
+Matcher::~Matcher()
+{
+    for (int i=0; i<matchers.size(); i++)
+        delete matchers[i];
+}
+
+bool Matcher::matches(const char *s)
+{
+    for (int i=0; i<matchers.size(); i++)
+        if (matchers[i]->matches(s))
+            return true;
+    return false;
+}
+
+void NewNetworkConfigurator::readAddressConfiguration(cXMLElement *root, cTopology& topo, NetworkInfo& networkInfo)
+{
+	cXMLElementList interfaceElements = root->getChildrenByTagName("interface"); //TODO rename to addressconstraint?
+	for (int i = 0; i < interfaceElements.size(); i++)
+    {
+    	cXMLElement *interfaceElement = interfaceElements[i];
+    	const char *hostAttr = interfaceElement->getAttribute("host");  // "host* router[0..3]"
+    	const char *interfaceAttr = interfaceElement->getAttribute("interface"); // "eth* ppp0"
+    	const char *towardsAttr = interfaceElement->getAttribute("towards"); // "ap switch"
+    	const char *addressAttr = interfaceElement->getAttribute("address"); // "10.0.x.x"
+    	const char *netmaskAttr = interfaceElement->getAttribute("netmask"); // "255.255.x.x"
+
+    	// process host/interface/towards expressions
+    	Matcher hostMatcher(hostAttr);
+        Matcher interfaceMatcher(interfaceAttr);
+        Matcher towardsMatcher(towardsAttr);
+
+    	// process addresses
+    	uint32_t address, addressSpecifiedBits, netmask, netmaskSpecifiedBits;
+    	parseAddressMask(addressAttr, address, addressSpecifiedBits);
+    	parseAddressMask(netmaskAttr, netmask, netmaskSpecifiedBits);
+
+    	// configure matching interfaces
+        std::set<InterfaceEntry*> interfacesSeen;
+        for (int i = 0; i < networkInfo.links.size(); i++)
+        {
+        	LinkInfo *linkInfo = networkInfo.links[i];
+        	for (int j = 0; j < linkInfo->interfaces.size(); j++)
+        	{
+        	    InterfaceInfo *interfaceInfo = linkInfo->interfaces[j];
+        	    cModule *hostModule = interfaceInfo->entry->getInterfaceTable()->getHostModule();
+                std::string hostFullPath = hostModule->getFullPath();
+                std::string hostShortenedFullPath = hostFullPath.substr(hostFullPath.find('.')+1);
+
+        	    if ((hostMatcher.matches(hostShortenedFullPath.c_str()) || hostMatcher.matches(hostFullPath.c_str())) &&
+        	            interfaceMatcher.matches(interfaceInfo->entry->getFullName()))  //TODO: towards
+        	    {
+        	        interfaceInfo->address = address;
+        	        interfaceInfo->addressSpecifiedBits = addressSpecifiedBits;
+        	        interfaceInfo->netmask = netmask;
+        	        interfaceInfo->netmaskSpecifiedBits = netmaskSpecifiedBits;
+        	    }
+        	}
+        }
+    }
+}
+
+void NewNetworkConfigurator::parseAddressMask(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits)
+{
+    // change "10.0.x.x" to "10.0.0.0" (for address) and "255.255.0.0" (for specifiedBits)
+    std::string address;
+    std::string specifiedBits;
+    cStringTokenizer tokenizer(addressAttr, ".");
+    while (tokenizer.hasMoreTokens())
+    {
+        std::string token = tokenizer.nextToken();
+        address += (token == "x") ? "0." : (token+".");
+        specifiedBits += (token == "x") ? "0." : "255.";
+    }
+    address = address.substr(0, address.size()-1);
+    specifiedBits = specifiedBits.substr(0, specifiedBits.size()-1);
+    if (!IPv4Address::isWellFormed(address.c_str()) || !IPv4Address::isWellFormed(specifiedBits.c_str()))
+        throw cRuntimeError("invalid address %s", addressAttr); //XXX context! where in XML?
+    outAddress = IPv4Address(address.c_str()).getInt();
+    outAddressSpecifiedBits = IPv4Address(specifiedBits.c_str()).getInt();
 }
 
 void NewNetworkConfigurator::handleMessage(cMessage *msg)

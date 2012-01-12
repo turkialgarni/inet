@@ -57,7 +57,7 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
         bool usesDefaultRoute;
     };
     struct LinkInfo {
-        std::vector<InterfaceInfo*> interfaces;
+        std::vector<InterfaceInfo*> interfaces; // interfaces on that LAN or point-to-point link
         ~LinkInfo() { for (int i = 0; i < interfaces.size(); i++) delete interfaces[i]; }
     };
     struct NetworkInfo {
@@ -84,14 +84,18 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
     virtual void initialize(int stage);
     virtual void handleMessage(cMessage *msg);
 
+    // main functionality
     virtual void extractTopology(cTopology& topo, NetworkInfo& networkInfo);
-    virtual void visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo* linkInfo, std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& nodesVisited);
-    void dump(const NetworkInfo& networkInfo);
-
+    virtual void readAddressConfiguration(cXMLElement *root, cTopology& topo, NetworkInfo& networkInfo);
     virtual void assignAddresses(cTopology& topo, NetworkInfo& networkInfo);
     virtual void checkAddresses(cTopology& topo, NetworkInfo& networkInfo);
     virtual void addDefaultRoutes(cTopology& topo, NetworkInfo& networkInfo);
     virtual void fillRoutingTables(cTopology& topo, NetworkInfo& networkInfo);
+    virtual void dump(const NetworkInfo& networkInfo);
+
+    // helper functions
+    virtual void parseAddressMask(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits);
+    virtual void visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo* linkInfo, std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& nodesVisited);
 };
 
 #endif

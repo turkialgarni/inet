@@ -24,6 +24,7 @@ simple NewNetworkConfigurator
 {
     parameters:
         @display("i=block/cogwheel_s");
+        xml config = default(xml("<empty/>"));
         bool addStaticRoutes = default(true);
         bool useDefaultRoutes = default(true);
 }
