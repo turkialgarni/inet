@@ -62,6 +62,12 @@ network Network
     submodules:
         configurator: NewNetworkConfigurator {
             @display("p=473,44");
+            config = xml("\
+            <root> \
+                <interface hosts='r0' towards='r1' address='99.100.x.x' netmask='255.255.x.x'/> \
+                <interface hosts='r8 r9' names='*' address='11.3.x.x' netmask='255.255.x.x'/> \
+            </root> \
+            ");
         }
         r0: Router {
             @display("p=335,251");

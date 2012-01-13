@@ -28,9 +28,13 @@
 
 Define_Module(NewNetworkConfigurator);
 
+inline bool isEmpty(const char *s) {return !s || !s[0];}
+inline bool isNotEmpty(const char *s) {return s && s[0];}
+
+
 void NewNetworkConfigurator::initialize(int stage)
 {
-    if (stage==2)
+    if (stage==2) //TODO parameter: melyik stage-ben csinal a cimkonfiguralast, es melyikben a route-okat
     {
         cTopology topo("topo");
         NetworkInfo networkInfo;
@@ -46,6 +50,9 @@ void NewNetworkConfigurator::initialize(int stage)
 
         // check IP address uniqueness over the network, and that all subnets live on a single link
         checkAddresses(topo, networkInfo);
+
+        // read and configure manual routes from the XML configuration
+        addManualRoutes(par("config").xmlValue(), networkInfo); // TODO use 2 separate XML files? "interfaceConfig", "manualRoutes" parameters
 
         if (par("addStaticRoutes").boolValue()) {
             // add default routes to hosts (nodes with a single attachment);
@@ -87,6 +94,7 @@ void NewNetworkConfigurator::extractTopology(cTopology& topo, NetworkInfo& netwo
         cModule *mod = node->getModule();
         NodeInfo *nodeInfo = new NodeInfo();
         networkInfo.nodes[node] = nodeInfo;
+        nodeInfo->module = mod;
         nodeInfo->isIPNode = IPvXAddressResolver().findInterfaceTableOf(mod)!=NULL;
         if (nodeInfo->isIPNode)
         {
@@ -168,31 +176,26 @@ void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo
     }
 }
 
-class Matcher
+NewNetworkConfigurator::Matcher::Matcher(const char *pattern)
 {
-    private:
-        std::vector<inet::PatternMatcher*> matchers; // TODO replace with a MatchExpression once it becomes available in OMNeT++
-    public:
-        Matcher(const char *pattern);
-        ~Matcher();
-        bool matches(const char *s);
-};
-
-Matcher::Matcher(const char *pattern)
-{
+    matchesany = isEmpty(pattern);
+    if (matchesany)
+        return;
     cStringTokenizer tokenizer(pattern);
     while (tokenizer.hasMoreTokens())
         matchers.push_back(new inet::PatternMatcher(tokenizer.nextToken(), true, true, true));
 }
 
-Matcher::~Matcher()
+NewNetworkConfigurator::Matcher::~Matcher()
 {
     for (int i=0; i<matchers.size(); i++)
         delete matchers[i];
 }
 
-bool Matcher::matches(const char *s)
+bool NewNetworkConfigurator::Matcher::matches(const char *s)
 {
+    if (matchesany)
+        return true;
     for (int i=0; i<matchers.size(); i++)
         if (matchers[i]->matches(s))
             return true;
@@ -201,52 +204,71 @@ bool Matcher::matches(const char *s)
 
 void NewNetworkConfigurator::readAddressConfiguration(cXMLElement *root, cTopology& topo, NetworkInfo& networkInfo)
 {
-	cXMLElementList interfaceElements = root->getChildrenByTagName("interface"); //TODO rename to addressconstraint?
+    std::set<InterfaceInfo*> interfacesSeen;
+	cXMLElementList interfaceElements = root->getChildrenByTagName("interface");
 	for (int i = 0; i < interfaceElements.size(); i++)
     {
-    	cXMLElement *interfaceElement = interfaceElements[i];
-    	const char *hostAttr = interfaceElement->getAttribute("host");  // "host* router[0..3]"
-    	const char *interfaceAttr = interfaceElement->getAttribute("interface"); // "eth* ppp0"
-    	const char *towardsAttr = interfaceElement->getAttribute("towards"); // "ap switch"
+	    cXMLElement *interfaceElement = interfaceElements[i];
+    	const char *hostAttr = interfaceElement->getAttribute("hosts");  // "host* router[0..3]"
+    	const char *interfaceAttr = interfaceElement->getAttribute("names"); // i.e. interface names, like "eth* ppp0"
+    	const char *towardsAttr = interfaceElement->getAttribute("towards"); // neighbor host names, like "ap switch"
+    	const char *configureAttr = interfaceElement->getAttribute("configure"); // "true" (default) or "false"
     	const char *addressAttr = interfaceElement->getAttribute("address"); // "10.0.x.x"
     	const char *netmaskAttr = interfaceElement->getAttribute("netmask"); // "255.255.x.x"
 
-    	// process host/interface/towards expressions
+    	// parse host/interface/towards expressions
     	Matcher hostMatcher(hostAttr);
         Matcher interfaceMatcher(interfaceAttr);
         Matcher towardsMatcher(towardsAttr);
 
-    	// process addresses
+    	// parse address/netmask constraints
+        bool haveAddressConstraint = isNotEmpty(addressAttr);
+        bool haveNetmaskConstraint = isNotEmpty(netmaskAttr);
     	uint32_t address, addressSpecifiedBits, netmask, netmaskSpecifiedBits;
-    	parseAddressMask(addressAttr, address, addressSpecifiedBits);
-    	parseAddressMask(netmaskAttr, netmask, netmaskSpecifiedBits);
+    	const char *atFileLine = interfaceElement->getSourceLocation();
+    	if (haveAddressConstraint)
+    	    parseAddressAndSpecifiedBits(addressAttr, address, addressSpecifiedBits, atFileLine);
+    	if (haveNetmaskConstraint)
+    	    parseAddressAndSpecifiedBits(netmaskAttr, netmask, netmaskSpecifiedBits, atFileLine);
 
-    	// configure matching interfaces
-        std::set<InterfaceEntry*> interfacesSeen;
+    	// configure address/netmask constraints on matching interfaces
         for (int i = 0; i < networkInfo.links.size(); i++)
         {
         	LinkInfo *linkInfo = networkInfo.links[i];
         	for (int j = 0; j < linkInfo->interfaces.size(); j++)
         	{
         	    InterfaceInfo *interfaceInfo = linkInfo->interfaces[j];
-        	    cModule *hostModule = interfaceInfo->entry->getInterfaceTable()->getHostModule();
-                std::string hostFullPath = hostModule->getFullPath();
-                std::string hostShortenedFullPath = hostFullPath.substr(hostFullPath.find('.')+1);
-
-        	    if ((hostMatcher.matches(hostShortenedFullPath.c_str()) || hostMatcher.matches(hostFullPath.c_str())) &&
-        	            interfaceMatcher.matches(interfaceInfo->entry->getFullName()))  //TODO: towards
+        	    if (interfacesSeen.count(interfaceInfo) == 0)
         	    {
-        	        interfaceInfo->address = address;
-        	        interfaceInfo->addressSpecifiedBits = addressSpecifiedBits;
-        	        interfaceInfo->netmask = netmask;
-        	        interfaceInfo->netmaskSpecifiedBits = netmaskSpecifiedBits;
+        	        cModule *hostModule = interfaceInfo->entry->getInterfaceTable()->getHostModule();
+        	        std::string hostFullPath = hostModule->getFullPath();
+        	        std::string hostShortenedFullPath = hostFullPath.substr(hostFullPath.find('.')+1);
+
+        	        // Note: "hosts", "interfaces" and "towards" must ALL match on the interface for the rule to apply
+        	        if ((hostMatcher.matches(hostShortenedFullPath.c_str()) || hostMatcher.matches(hostFullPath.c_str())) &&
+        	                (interfaceMatcher.matchesAny() || interfaceMatcher.matches(interfaceInfo->entry->getFullName())) &&
+        	                (towardsMatcher.matchesAny() || linkContainsMatchingHost(linkInfo, &towardsMatcher)))
+        	        {
+        	            if (isNotEmpty(configureAttr)) {
+        	                interfaceInfo->configure = strcmp(configureAttr, "true")==0;
+        	            }
+        	            if (haveAddressConstraint) {
+        	                interfaceInfo->address = address;
+        	                interfaceInfo->addressSpecifiedBits = addressSpecifiedBits;
+        	            }
+        	            if (haveNetmaskConstraint) {
+        	                interfaceInfo->netmask = netmask;
+        	                interfaceInfo->netmaskSpecifiedBits = netmaskSpecifiedBits;
+        	                interfacesSeen.insert(interfaceInfo);
+        	            }
+        	        }
         	    }
         	}
         }
     }
 }
 
-void NewNetworkConfigurator::parseAddressMask(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits)
+void NewNetworkConfigurator::parseAddressAndSpecifiedBits(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits, const char *atFileLine)
 {
     // change "10.0.x.x" to "10.0.0.0" (for address) and "255.255.0.0" (for specifiedBits)
     std::string address;
@@ -260,10 +282,26 @@ void NewNetworkConfigurator::parseAddressMask(const char *addressAttr, uint32_t&
     }
     address = address.substr(0, address.size()-1);
     specifiedBits = specifiedBits.substr(0, specifiedBits.size()-1);
+
     if (!IPv4Address::isWellFormed(address.c_str()) || !IPv4Address::isWellFormed(specifiedBits.c_str()))
-        throw cRuntimeError("invalid address %s", addressAttr); //XXX context! where in XML?
+        throw cRuntimeError("Malformed IPv4 address or netmask constraint '%s' at %s", addressAttr, atFileLine);
+
     outAddress = IPv4Address(address.c_str()).getInt();
     outAddressSpecifiedBits = IPv4Address(specifiedBits.c_str()).getInt();
+}
+
+bool NewNetworkConfigurator::linkContainsMatchingHost(LinkInfo *linkInfo, Matcher *hostMatcher)
+{
+    for (int i = 0; i < linkInfo->interfaces.size(); i++)
+    {
+        InterfaceInfo *interfaceInfo = linkInfo->interfaces[i];
+        cModule *hostModule = interfaceInfo->entry->getInterfaceTable()->getHostModule();
+        std::string hostFullPath = hostModule->getFullPath();
+        std::string hostShortenedFullPath = hostFullPath.substr(hostFullPath.find('.')+1);
+        if (hostMatcher->matches(hostShortenedFullPath.c_str()) || hostMatcher->matches(hostFullPath.c_str()))
+            return true;
+    }
+    return false;
 }
 
 void NewNetworkConfigurator::handleMessage(cMessage *msg)
@@ -463,6 +501,201 @@ void NewNetworkConfigurator::checkAddresses(cTopology& topo, NetworkInfo& networ
     // TODO: check that all subnets live on a single link
 }
 
+const char *NewNetworkConfigurator::getMandatoryAttribute(cXMLElement *element, const char *attr)
+{
+    const char *value = element->getAttribute(attr);
+    if (isEmpty(value))
+        throw cRuntimeError("<%s> element is missing mandatory attribute \"%s\" at %s", element->getTagName(), attr, element->getSourceLocation());
+    return value;
+}
+
+void NewNetworkConfigurator::addManualRoutes(cXMLElement *root, NetworkInfo& networkInfo)
+{
+    cXMLElementList routeElements = root->getChildrenByTagName("route");
+    std::vector<NodeInfo*> nodes; // motivation: linear search in the networkInfo.nodes map is slow
+    if (routeElements.size() != 0)
+        for (std::map<cTopology::Node*, NodeInfo*>::iterator it = networkInfo.nodes.begin(); it != networkInfo.nodes.end(); it++)
+            nodes.push_back(it->second);
+    for (int i = 0; i < routeElements.size(); i++)
+    {
+        cXMLElement *routeElement = routeElements[i];
+        const char *atAttr = getMandatoryAttribute(routeElement, "at");
+        const char *hostAttr = getMandatoryAttribute(routeElement, "host"); // destination address  (IPvXAddressResolver syntax)
+        const char *netmaskAttr = routeElement->getAttribute("netmask"); // default: 255.255.255.255; alternative notation: "/23"
+        const char *gatewayAttr = routeElement->getAttribute("gateway"); // next hop address (IPvXAddressResolver syntax)
+        const char *interfaceAttr = routeElement->getAttribute("interface"); // output interface name
+        const char *metricAttr = routeElement->getAttribute("metric");
+
+        // parse and check the attributes
+        IPv4Address host = IPvXAddressResolver().resolve(hostAttr, IPvXAddressResolver::ADDR_IPv4).get4();
+        if (host.isUnspecified())
+            throw cRuntimeError("Incomplete route: host is unspecified at %s", routeElement->getSourceLocation());
+        IPv4Address netmask;
+        if (isEmpty(netmaskAttr))
+            netmask = IPv4Address::ALLONES_ADDRESS;
+        else if (netmaskAttr[0] == '/')
+            netmask = IPv4Address::makeNetmask(atoi(netmaskAttr+1));
+        else
+            netmask = IPv4Address(netmaskAttr);
+        if (!netmask.isValidNetmask())
+            throw cRuntimeError("Wrong netmask %s for route at %s", netmask.str().c_str(), routeElement->getSourceLocation());
+        if (isEmpty(interfaceAttr) && isEmpty(gatewayAttr))
+            throw cRuntimeError("Incomplete route: either gateway or interface (or both) must be specified at %s", routeElement->getSourceLocation());
+
+        // find matching host(s), and add the route
+        Matcher atMatcher(atAttr);
+        for (int i = 0; i < nodes.size(); i++) {
+            NodeInfo *node = nodes[i];
+            if (node->isIPNode) {
+                std::string hostFullPath = node->module->getFullPath();
+                std::string hostShortenedFullPath = hostFullPath.substr(hostFullPath.find('.')+1);
+                if (atMatcher.matches(hostShortenedFullPath.c_str()) || atMatcher.matches(hostFullPath.c_str())) {
+                    // determine the gateway (its address towards this node!) and the output interface for the route (must be done per node)
+                    InterfaceEntry *ie;
+                    IPv4Address gateway;
+                    resolveInterfaceAndGateway(node, interfaceAttr, gatewayAttr, ie, gateway, networkInfo, routeElement->getSourceLocation());
+
+                    // create and add route
+                    IPv4Route *route = new IPv4Route();
+                    route->setHost(host);
+                    route->setNetmask(netmask);
+                    route->setGateway(gateway); // may be unspecified
+                    route->setInterface(ie);
+                    if (isNotEmpty(metricAttr))
+                        route->setMetric(atoi(metricAttr));
+                    node->rt->addRoute(route);
+                }
+            }
+        }
+    }
+}
+
+void NewNetworkConfigurator::resolveInterfaceAndGateway(NodeInfo *node, const char *interfaceAttr, const char *gatewayAttr,
+        InterfaceEntry *&outIE, IPv4Address& outGateway, const NetworkInfo& networkInfo, const char *fileLine)
+{
+    // resolve interface name
+    if (isEmpty(interfaceAttr))
+    {
+        outIE = NULL;
+    }
+    else
+    {
+        outIE = node->ift->getInterfaceByName(interfaceAttr);
+        if (!outIE)
+            throw cRuntimeError("Host/router %s has no interface named \"%s\" for route at %s",
+                    node->module->getFullPath().c_str(), interfaceAttr, fileLine);
+    }
+
+    // if gateway is not specified, we are done
+    if (isEmpty(gatewayAttr))
+    {
+        outGateway = IPv4Address();
+        return; // outInterface also already done -- we're done
+    }
+
+    ASSERT(isNotEmpty(gatewayAttr)); // see "if" above
+
+    // check syntax of gatewayAttr, and obtain an initial value
+    outGateway = IPvXAddressResolver().resolve(gatewayAttr, IPvXAddressResolver::ADDR_IPv4).get4();
+
+    IPv4Address gatewayAddressOnCommonLink;
+
+    if (!outIE)
+    {
+        // interface is not specified explicitly -- we must deduce it from the gateway.
+        // It is expected that the gateway is on the same link with the configured node,
+        // and then we pick the interface which connects to that link.
+
+        // loop through all links, and find the one that contains both the
+        // configured node and the gateway
+        for (int i = 0; i < networkInfo.links.size(); i++)
+        {
+            LinkInfo *linkInfo = networkInfo.links[i];
+            InterfaceInfo *gatewayInterfaceOnLink = findInterfaceOnLinkByNodeAddress(linkInfo, outGateway);
+            if (gatewayInterfaceOnLink)
+            {
+                InterfaceInfo *nodeInterfaceOnLink = findInterfaceOnLinkByNode(linkInfo, node->module);
+                if (nodeInterfaceOnLink)
+                {
+                    outIE = nodeInterfaceOnLink->entry;
+                    gatewayAddressOnCommonLink = gatewayInterfaceOnLink->entry->ipv4Data()->getIPAddress(); // we may need it later
+                    break;
+                }
+            }
+        }
+        if (!outIE)
+            throw cRuntimeError("Host/router %s has no interface towards \"%s\" for route at %s",
+                    node->module->getFullPath().c_str(), gatewayAttr, fileLine);
+    }
+
+    // Now we have both the interface and the gateway. Still, we may need to modify
+    // the gateway address by picking the address of a different interface of the gateway --
+    // the address of the interface which is towards the configured node (i.e. on the same link)
+    //
+    // gatewayAttr may be an IP address, or a module name, or modulename+interfacename
+    // in a syntax accepted by IPvXAddressResolver. If the gatewayAttr is a concrete IP address
+    // or contains a gateway interface name (IPvXAddressResolver accepts it after a "/"), we're done
+    if (IPv4Address::isWellFormed(gatewayAttr) || strchr(gatewayAttr, '/') != NULL)
+        return;
+
+    // At this point, gatewayAttr must be a modulename string, so we can freely pick the
+    // interface that's towards the configured node
+    if (!gatewayAddressOnCommonLink.isUnspecified())
+        outGateway = gatewayAddressOnCommonLink;
+    else {
+        // find the gateway interface that's on the same link as outIE
+
+        // first, find which link outIE is on...
+        LinkInfo *linkInfo = findLinkOfInterface(networkInfo, outIE);
+
+        // then find which gateway interface is on that link
+        InterfaceInfo *gatewayInterface = findInterfaceOnLinkByNodeAddress(linkInfo, outGateway);
+        if (gatewayInterface)
+            outGateway = gatewayInterface->entry->ipv4Data()->getIPAddress();
+    }
+}
+
+NewNetworkConfigurator::InterfaceInfo *NewNetworkConfigurator::findInterfaceOnLinkByNode(LinkInfo *linkInfo, cModule *node)
+{
+    for (int i = 0; i < linkInfo->interfaces.size(); i++)
+    {
+        InterfaceInfo *interfaceInfo = linkInfo->interfaces[i];
+        if (interfaceInfo->entry->getInterfaceTable()->getHostModule() == node)
+            return interfaceInfo;
+    }
+    return NULL;
+}
+
+NewNetworkConfigurator::InterfaceInfo *NewNetworkConfigurator::findInterfaceOnLinkByNodeAddress(LinkInfo *linkInfo, IPv4Address address)
+{
+    for (int i = 0; i < linkInfo->interfaces.size(); i++)
+    {
+        // if the interface has this address, found
+        InterfaceInfo *interfaceInfo = linkInfo->interfaces[i];
+        if (interfaceInfo->entry->ipv4Data()->getIPAddress() == address)
+            return interfaceInfo;
+
+        // if some other interface of the same node has the address, we accept that too
+        IInterfaceTable *ift = interfaceInfo->entry->getInterfaceTable();
+        for (int j = 0; j < ift->getNumInterfaces(); j++)
+            if (ift->getInterface(j)->ipv4Data()->getIPAddress() == address)
+                return interfaceInfo;
+    }
+    return NULL;
+}
+
+NewNetworkConfigurator::LinkInfo *NewNetworkConfigurator::findLinkOfInterface(const NetworkInfo& networkInfo, InterfaceEntry *ie)
+{
+    for (int i = 0; i < networkInfo.links.size(); i++)
+    {
+        LinkInfo *linkInfo = networkInfo.links[i];
+        for (int j = 0; j < linkInfo->interfaces.size(); j++)
+            if (linkInfo->interfaces[j]->entry == ie)
+                return linkInfo;
+    }
+    return NULL;
+}
+
 void NewNetworkConfigurator::addDefaultRoutes(cTopology& topo, NetworkInfo& networkInfo)
 {
     // add default route to nodes with exactly one (non-loopback) interface
@@ -505,6 +738,7 @@ void NewNetworkConfigurator::addDefaultRoutes(cTopology& topo, NetworkInfo& netw
 
 void NewNetworkConfigurator::fillRoutingTables(cTopology& topo, NetworkInfo& networkInfo)
 {
+//TODO it should be configurable (via xml?) which nodes need routing tables to be filled in automatically
     // fill in routing tables with static routes
     for (int i=0; i<topo.getNumNodes(); i++)
     {
