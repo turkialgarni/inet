@@ -19,7 +19,7 @@
 // NOTE: This file is a near copy of the similar file in OMNeT++ 4.2, but under LGPL.
 // Added here until the same functionality becomes available in OMNeT++ as public API.
 
-#include "patternmatcher.h"
+#include "PatternMatcher.h"
 
 using namespace inet;
 
