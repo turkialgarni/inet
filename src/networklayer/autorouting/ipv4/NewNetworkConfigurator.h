@@ -114,12 +114,12 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
     virtual void dump(const NetworkInfo& networkInfo);
 
     // helper functions
-    virtual void parseAddressAndSpecifiedBits(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits, const char *atFileLine);
-    virtual bool linkContainsMatchingHost(LinkInfo *linkInfo, Matcher *hostMatcher);
+    virtual void parseAddressAndSpecifiedBits(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits);
+    virtual bool linkContainsMatchingHostExcept(LinkInfo *linkInfo, Matcher *hostMatcher, cModule *exceptModule);
     virtual void visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo* linkInfo, std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& nodesVisited);
     const char *getMandatoryAttribute(cXMLElement *element, const char *attr);
     virtual void resolveInterfaceAndGateway(NodeInfo *node, const char *interfaceAttr, const char *gatewayAttr,
-            InterfaceEntry *&outIE, IPv4Address& outGateway, const NetworkInfo& networkInfo, const char *fileLine);
+            InterfaceEntry *&outIE, IPv4Address& outGateway, const NetworkInfo& networkInfo);
     InterfaceInfo *findInterfaceOnLinkByNode(LinkInfo *linkInfo, cModule *node);
     InterfaceInfo *findInterfaceOnLinkByNodeAddress(LinkInfo *linkInfo, IPv4Address address);
     LinkInfo *findLinkOfInterface(const NetworkInfo& networkInfo, InterfaceEntry *ie);
