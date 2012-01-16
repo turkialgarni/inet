@@ -21,6 +21,7 @@
 
 package inet.examples.inet.kidsnw1;
 
+import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
 import inet.nodes.inet.Router;
 import inet.nodes.inet.StandardHost;
 import ned.DatarateChannel;
@@ -42,49 +43,43 @@ network KIDSNw1
     submodules:
         host1: StandardHost {
             parameters:
-                IPForward = false;
-                routingFile = "host1.irt";
                 @display("p=101,307,row;i=device/pc2");
         }
         host2: StandardHost {
             parameters:
-                IPForward = false;
-                routingFile = "host2.irt";
                 @display("p=202,307,row;i=device/pc2");
         }
         host3: StandardHost {
             parameters:
-                IPForward = false;
-                routingFile = "host3.irt";
                 @display("p=368,307,row;i=device/pc2");
         }
         // First Hop Router
         fhrouter1: Router {
             parameters:
-                routingFile = "fhrouter1.irt";
                 @display("p=154,222,row,130");
         }
         fhrouter2: Router {
             parameters:
-                routingFile = "fhrouter5.irt";
                 @display("p=358,222,row,130");
         }
         // InteriorRouter
         irouter: Router {
             parameters:
-                routingFile = "irouter2.irt";
                 @display("p=167,142");
         }
         // Border Gateway Router
         bgrouter3: Router {
             parameters:
-                routingFile = "bgrouter3.irt";
-                @display("p=185,61,row");
+                @display("p=193,70,row");
         }
         bgrouter4: Router {
             parameters:
-                routingFile = "bgrouter4.irt";
-                @display("p=319,61,row");
+                @display("p=329,101,row");
+        }
+        newNetworkConfigurator: NewNetworkConfigurator {
+            parameters:
+                config = xmldoc("netconf.xml");
+                @display("p=93,22");
         }
     connections:
         // host connections
