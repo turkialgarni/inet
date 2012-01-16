@@ -206,9 +206,9 @@ inline bool strToBool(const char *str, bool defaultValue)
 {
     if (!str || !str[0])
         return defaultValue;
-    if (strcmp(str,"true"))
+    if (strcmp(str,"true")==0)
         return true;
-    if (strcmp(str,"false"))
+    if (strcmp(str,"false")==0)
         return false;
     throw cRuntimeError("invalid boolean XML attribute:'%s'", str);
 }
@@ -239,8 +239,8 @@ void NewNetworkConfigurator::readAddressConfiguration(cXMLElement *root, cTopolo
     	    // parse address/netmask constraints
             bool haveAddressConstraint = isNotEmpty(addressAttr);
     	    bool haveNetmaskConstraint = isNotEmpty(netmaskAttr);
-    	    if (doConfigure && (haveAddressConstraint || haveNetmaskConstraint))
-    	        throw cRuntimeError("XML error: configure attribute is false but entry has address or netmask attributes, too");
+    	    if (!doConfigure && (haveAddressConstraint || haveNetmaskConstraint))
+    	        throw cRuntimeError("configure attribute is false but entry has address or netmask attributes, too");
 
     	    uint32_t address, addressSpecifiedBits, netmask, netmaskSpecifiedBits;
     	    if (haveAddressConstraint)
