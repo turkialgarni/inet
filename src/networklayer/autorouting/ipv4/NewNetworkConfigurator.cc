@@ -582,7 +582,7 @@ void NewNetworkConfigurator::addManualRoutes(cXMLElement *root, NetworkInfo& net
 
                         // create and add route
                         IPv4Route *route = new IPv4Route();
-                        route->setHost(host);
+                        route->setDestination(host);
                         route->setNetmask(netmask);
                         route->setGateway(gateway); // may be unspecified
                         route->setInterface(ie);
@@ -757,7 +757,7 @@ void NewNetworkConfigurator::addDefaultRoutes(cTopology& topo, NetworkInfo& netw
 
         // NOTE: we don't specify the gateway in the default route which may result in extra ARP requests
         IPv4Route *route = new IPv4Route();
-        route->setHost(IPv4Address());
+        route->setDestination(IPv4Address());
         route->setNetmask(IPv4Address());
         route->setInterface(ie);
         route->setType(IPv4Route::REMOTE);
@@ -828,7 +828,7 @@ void NewNetworkConfigurator::fillRoutingTables(cTopology& topo, NetworkInfo& net
             IRoutingTable *rt = sourceNodeInfo->rt;
             IPv4Route *route = new IPv4Route();
             IPv4InterfaceData *ipv4Data = destInterface->ipv4Data();
-            route->setHost(IPv4Address(ipv4Data->getIPAddress().getInt() & ipv4Data->getNetmask().getInt()));
+            route->setDestination(IPv4Address(ipv4Data->getIPAddress().getInt() & ipv4Data->getNetmask().getInt()));
             route->setNetmask(ipv4Data->getNetmask());
             route->setInterface(sourceInterface);
             route->setGateway(nextHopInterface->ipv4Data()->getIPAddress());
