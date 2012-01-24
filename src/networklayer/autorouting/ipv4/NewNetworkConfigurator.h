@@ -70,20 +70,7 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
     struct NetworkInfo {  //TODO put cTopology* into it
         std::map<cTopology::Node*, NodeInfo*> nodes;
         std::vector<LinkInfo*> links;
-        std::vector<IPv4Address> addresses;
-        std::vector<IPv4Address> netmasks;
         ~NetworkInfo() { for (int i = 0; i < links.size(); i++) delete links[i]; }
-        void addAddressPrefix(IPv4Address address, IPv4Address netmask) { addresses.push_back(address); netmasks.push_back(netmask); }
-        std::vector<IPv4Address>& getNetworkAddresses() { return addresses; }
-        bool isUniqueAddressPrefix(IPv4Address address, IPv4Address netmask)
-        {
-            for (int i = 0; i < addresses.size(); i++) {
-                int commonNetmask = netmasks.at(i).getInt() & netmask.getInt();
-                if ((addresses.at(i).getInt() & commonNetmask) == (address.getInt() & commonNetmask))
-                    return false;
-            }
-            return true;
-        }
     };
 
     class Matcher
@@ -107,11 +94,12 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
     virtual void extractTopology(cTopology& topo, NetworkInfo& networkInfo);
     virtual void readAddressConfiguration(cXMLElement *root, cTopology& topo, NetworkInfo& networkInfo);
     virtual void assignAddresses(cTopology& topo, NetworkInfo& networkInfo);
-    virtual void checkAddresses(cTopology& topo, NetworkInfo& networkInfo);
     virtual void addDefaultRoutes(cTopology& topo, NetworkInfo& networkInfo);
     virtual void addManualRoutes(cXMLElement *root, NetworkInfo& networkInfo);
     virtual void fillRoutingTables(cTopology& topo, NetworkInfo& networkInfo);
-    virtual void dump(const NetworkInfo& networkInfo);
+    virtual void optimizeRoutingTables(cTopology& topo, NetworkInfo& networkInfo);
+    virtual void dumpAddresses(cTopology& topo, NetworkInfo& networkInfo);
+    virtual void dumpRoutes(cTopology& topo, NetworkInfo& networkInfo);
 
     // helper functions
     virtual void parseAddressAndSpecifiedBits(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits);
@@ -123,6 +111,7 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
     InterfaceInfo *findInterfaceOnLinkByNode(LinkInfo *linkInfo, cModule *node);
     InterfaceInfo *findInterfaceOnLinkByNodeAddress(LinkInfo *linkInfo, IPv4Address address);
     LinkInfo *findLinkOfInterface(const NetworkInfo& networkInfo, InterfaceEntry *ie);
+    InterfaceInfo *createInterfaceInfo(InterfaceEntry *ie);
 };
 
 #endif

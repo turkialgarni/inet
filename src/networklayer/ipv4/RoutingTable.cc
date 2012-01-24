@@ -508,8 +508,8 @@ void RoutingTable::internalAddRoute(IPv4Route *entry)
     if (!entry->getNetmask().isValidNetmask())
         error("addRoute(): wrong netmask %s in route", entry->getNetmask().str().c_str());
 
-    if (entry->getDestination().doAnd(entry->getNetmask()).getInt() != 0)
-        error("addRoute(): suspicious route: host %s has 1-bits outside netmask %s",
+    if ((entry->getDestination().getInt() & ~entry->getNetmask().getInt()) != 0)
+        error("addRoute(): suspicious route: destination IP address %s has bits set outside netmask %s",
               entry->getDestination().str().c_str(), entry->getNetmask().str().c_str());
 
     // check that the interface exists
