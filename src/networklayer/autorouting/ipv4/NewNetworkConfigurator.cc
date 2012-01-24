@@ -61,12 +61,9 @@ void NewNetworkConfigurator::initialize(int stage)
             fillRoutingTables(topo, networkInfo);
         }
 
-        // TODO: optimize routing tables based on the following operations:
-        // - check if two subsequent routes can be swapped
-        // - check if two subsequent routes complement each other
-        // - check if a route is covered by the preceding one
-        // - optionally check if two routes can be aggressively merged without changing the meaning of all other routes
-        optimizeRoutingTables(topo, networkInfo);
+        // optimize routing tables
+        if (par("optimizeRoutes").boolValue())
+            optimizeRoutingTables(topo, networkInfo);
 
         // dump result
         if (par("dumpAddresses").boolValue())
@@ -78,10 +75,10 @@ void NewNetworkConfigurator::initialize(int stage)
 
 static cTopology::LinkOut *findLinkOut(cTopology::Node *node, int gateId)
 {
-	for (int i=0; i<node->getNumOutLinks(); i++)
-		if (node->getLinkOut(i)->getLocalGateId() == gateId)
-			return node->getLinkOut(i);
-	return NULL;
+    for (int i=0; i<node->getNumOutLinks(); i++)
+        if (node->getLinkOut(i)->getLocalGateId() == gateId)
+            return node->getLinkOut(i);
+    return NULL;
 }
 
 void NewNetworkConfigurator::extractTopology(cTopology& topo, NetworkInfo& networkInfo)
@@ -110,31 +107,31 @@ void NewNetworkConfigurator::extractTopology(cTopology& topo, NetworkInfo& netwo
     std::set<InterfaceEntry*> interfacesSeen;
     for (int i = 0; i < topo.getNumNodes(); i++)
     {
-    	cModule *mod = topo.getNode(i)->getModule();
-    	IInterfaceTable *ift = IPvXAddressResolver().findInterfaceTableOf(mod);
-    	if (ift)
-    	{
-    		for (int j = 0; j < ift->getNumInterfaces(); j++)
-    		{
-    			InterfaceEntry *ie = ift->getInterface(j);
-    			if (!ie->isLoopback() && interfacesSeen.count(ie) == 0)  // "not yet seen"
-    			{
-    				// store interface as belonging to a new network link
-			        networkInfo.links.push_back(new LinkInfo());
-			        LinkInfo* linkInfo = networkInfo.links.back();
-			        linkInfo->interfaces.push_back(createInterfaceInfo(ie));
-    				interfacesSeen.insert(ie);
+        cModule *mod = topo.getNode(i)->getModule();
+        IInterfaceTable *ift = IPvXAddressResolver().findInterfaceTableOf(mod);
+        if (ift)
+        {
+            for (int j = 0; j < ift->getNumInterfaces(); j++)
+            {
+                InterfaceEntry *ie = ift->getInterface(j);
+                if (!ie->isLoopback() && interfacesSeen.count(ie) == 0)  // "not yet seen"
+                {
+                    // store interface as belonging to a new network link
+                    networkInfo.links.push_back(new LinkInfo());
+                    LinkInfo* linkInfo = networkInfo.links.back();
+                    linkInfo->interfaces.push_back(createInterfaceInfo(ie));
+                    interfacesSeen.insert(ie);
 
-    				// visit neighbor (and potentially the whole LAN, recursively)
-    				cTopology::LinkOut *linkOut = findLinkOut(topo.getNode(i), ie->getNodeOutputGateId());
-    				if (linkOut)
-    				{
-				        std::vector<cTopology::Node*> empty;
-				        visitNeighbor(linkOut, linkInfo, interfacesSeen, empty);
-    				}
-    			}
-    		}
-    	}
+                    // visit neighbor (and potentially the whole LAN, recursively)
+                    cTopology::LinkOut *linkOut = findLinkOut(topo.getNode(i), ie->getNodeOutputGateId());
+                    if (linkOut)
+                    {
+                        std::vector<cTopology::Node*> empty;
+                        visitNeighbor(linkOut, linkInfo, interfacesSeen, empty);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -148,7 +145,7 @@ template<typename T>
 inline bool contains(const std::vector<T>& v, T& a) {return find(v, a) != v.end();}
 
 void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo* linkInfo,
-		std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& deviceNodesVisited)
+        std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& deviceNodesVisited)
 {
     cModule *neighborMod = linkOut->getRemoteNode()->getModule();
     int neighborInputGateId = linkOut->getRemoteGateId();
@@ -157,11 +154,11 @@ void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo
     {
         // neighbor is a host or router, just add the interface
         InterfaceEntry *neighborIe = neighborIft->getInterfaceByNodeInputGateId(neighborInputGateId);
-		if (interfacesSeen.count(neighborIe) == 0)  // "not yet seen"
-		{
-	        linkInfo->interfaces.push_back(createInterfaceInfo(neighborIe));
-	        interfacesSeen.insert(neighborIe);
-		}
+        if (interfacesSeen.count(neighborIe) == 0)  // "not yet seen"
+        {
+            linkInfo->interfaces.push_back(createInterfaceInfo(neighborIe));
+            interfacesSeen.insert(neighborIe);
+        }
     }
     else
     {
@@ -169,12 +166,12 @@ void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo
         cTopology::Node *deviceNode = linkOut->getRemoteNode();
         if (!contains(deviceNodesVisited, deviceNode))
         {
-        	deviceNodesVisited.push_back(deviceNode);
-        	for (int i = 0; i < deviceNode->getNumOutLinks(); i++)
-        	{
-        		cTopology::LinkOut *deviceLinkOut = deviceNode->getLinkOut(i);
-        		visitNeighbor(deviceLinkOut, linkInfo, interfacesSeen, deviceNodesVisited);
-        	}
+            deviceNodesVisited.push_back(deviceNode);
+            for (int i = 0; i < deviceNode->getNumOutLinks(); i++)
+            {
+                cTopology::LinkOut *deviceLinkOut = deviceNode->getLinkOut(i);
+                visitNeighbor(deviceLinkOut, linkInfo, interfacesSeen, deviceNodesVisited);
+            }
         }
     }
 }
@@ -236,71 +233,71 @@ inline bool strToBool(const char *str, bool defaultValue)
 void NewNetworkConfigurator::readAddressConfiguration(cXMLElement *root, cTopology& topo, NetworkInfo& networkInfo)
 {
     std::set<InterfaceInfo*> interfacesSeen;
-	cXMLElementList interfaceElements = root->getChildrenByTagName("interface");
-	for (int i = 0; i < interfaceElements.size(); i++)
+    cXMLElementList interfaceElements = root->getChildrenByTagName("interface");
+    for (int i = 0; i < interfaceElements.size(); i++)
     {
-	    cXMLElement *interfaceElement = interfaceElements[i];
-    	const char *hostAttr = interfaceElement->getAttribute("hosts");  // "host* router[0..3]"
-    	const char *interfaceAttr = interfaceElement->getAttribute("names"); // i.e. interface names, like "eth* ppp0"
-    	const char *towardsAttr = interfaceElement->getAttribute("towards"); // neighbor host names, like "ap switch"
-    	const char *configureAttr = interfaceElement->getAttribute("configure"); // "true" (default) or "false"
-    	const char *addressAttr = interfaceElement->getAttribute("address"); // "10.0.x.x"
-    	const char *netmaskAttr = interfaceElement->getAttribute("netmask"); // "255.255.x.x"
+        cXMLElement *interfaceElement = interfaceElements[i];
+        const char *hostAttr = interfaceElement->getAttribute("hosts");  // "host* router[0..3]"
+        const char *interfaceAttr = interfaceElement->getAttribute("names"); // i.e. interface names, like "eth* ppp0"
+        const char *towardsAttr = interfaceElement->getAttribute("towards"); // neighbor host names, like "ap switch"
+        const char *configureAttr = interfaceElement->getAttribute("configure"); // "true" (default) or "false"
+        const char *addressAttr = interfaceElement->getAttribute("address"); // "10.0.x.x"
+        const char *netmaskAttr = interfaceElement->getAttribute("netmask"); // "255.255.x.x"
 
-    	try
-    	{
-    	    // parse host/interface/towards expressions
-    	    Matcher hostMatcher(hostAttr);
-    	    Matcher interfaceMatcher(interfaceAttr);
-    	    Matcher towardsMatcher(towardsAttr);
+        try
+        {
+            // parse host/interface/towards expressions
+            Matcher hostMatcher(hostAttr);
+            Matcher interfaceMatcher(interfaceAttr);
+            Matcher towardsMatcher(towardsAttr);
 
-    	    bool doConfigure = strToBool(configureAttr, true);
+            bool doConfigure = strToBool(configureAttr, true);
 
-    	    // parse address/netmask constraints
+            // parse address/netmask constraints
             bool haveAddressConstraint = isNotEmpty(addressAttr);
-    	    bool haveNetmaskConstraint = isNotEmpty(netmaskAttr);
-    	    if (!doConfigure && (haveAddressConstraint || haveNetmaskConstraint))
-    	        throw cRuntimeError("configure attribute is false but entry has address or netmask attributes, too");
+            bool haveNetmaskConstraint = isNotEmpty(netmaskAttr);
+            if (!doConfigure && (haveAddressConstraint || haveNetmaskConstraint))
+                throw cRuntimeError("configure attribute is false but entry has address or netmask attributes, too");
 
-    	    uint32_t address, addressSpecifiedBits, netmask, netmaskSpecifiedBits;
-    	    if (haveAddressConstraint)
-    	        parseAddressAndSpecifiedBits(addressAttr, address, addressSpecifiedBits);
-    	    if (haveNetmaskConstraint)
-    	        parseAddressAndSpecifiedBits(netmaskAttr, netmask, netmaskSpecifiedBits);
+            uint32_t address, addressSpecifiedBits, netmask, netmaskSpecifiedBits;
+            if (haveAddressConstraint)
+                parseAddressAndSpecifiedBits(addressAttr, address, addressSpecifiedBits);
+            if (haveNetmaskConstraint)
+                parseAddressAndSpecifiedBits(netmaskAttr, netmask, netmaskSpecifiedBits);
 
-    	    // configure address/netmask constraints on matching interfaces
-    	    for (int i = 0; i < networkInfo.links.size(); i++)
-    	    {
-    	        LinkInfo *linkInfo = networkInfo.links[i];
-    	        for (int j = 0; j < linkInfo->interfaces.size(); j++)
-    	        {
-    	            InterfaceInfo *interfaceInfo = linkInfo->interfaces[j];
-    	            if (interfacesSeen.count(interfaceInfo) == 0)
-    	            {
-    	                cModule *hostModule = interfaceInfo->entry->getInterfaceTable()->getHostModule();
-    	                std::string hostFullPath = hostModule->getFullPath();
-    	                std::string hostShortenedFullPath = hostFullPath.substr(hostFullPath.find('.')+1);
+            // configure address/netmask constraints on matching interfaces
+            for (int i = 0; i < networkInfo.links.size(); i++)
+            {
+                LinkInfo *linkInfo = networkInfo.links[i];
+                for (int j = 0; j < linkInfo->interfaces.size(); j++)
+                {
+                    InterfaceInfo *interfaceInfo = linkInfo->interfaces[j];
+                    if (interfacesSeen.count(interfaceInfo) == 0)
+                    {
+                        cModule *hostModule = interfaceInfo->entry->getInterfaceTable()->getHostModule();
+                        std::string hostFullPath = hostModule->getFullPath();
+                        std::string hostShortenedFullPath = hostFullPath.substr(hostFullPath.find('.')+1);
 
-    	                // Note: "hosts", "interfaces" and "towards" must ALL match on the interface for the rule to apply
-    	                if ((hostMatcher.matchesAny() || hostMatcher.matches(hostShortenedFullPath.c_str()) || hostMatcher.matches(hostFullPath.c_str())) &&
-    	                        (interfaceMatcher.matchesAny() || interfaceMatcher.matches(interfaceInfo->entry->getFullName())) &&
-    	                        (towardsMatcher.matchesAny() || linkContainsMatchingHostExcept(linkInfo, &towardsMatcher, hostModule)))
-    	                {
-    	                    interfaceInfo->configure = configureAttr;
-    	                    if (haveAddressConstraint) {
-    	                        interfaceInfo->address = address;
-    	                        interfaceInfo->addressSpecifiedBits = addressSpecifiedBits;
-    	                    }
-    	                    if (haveNetmaskConstraint) {
-    	                        interfaceInfo->netmask = netmask;
-    	                        interfaceInfo->netmaskSpecifiedBits = netmaskSpecifiedBits;
-    	                    }
-    	                    interfacesSeen.insert(interfaceInfo);
-    	                    EV << hostModule->getFullPath() << ":" << interfaceInfo->entry->getFullName() << endl;
-    	                }
-    	            }
-    	        }
-    	    }
+                        // Note: "hosts", "interfaces" and "towards" must ALL match on the interface for the rule to apply
+                        if ((hostMatcher.matchesAny() || hostMatcher.matches(hostShortenedFullPath.c_str()) || hostMatcher.matches(hostFullPath.c_str())) &&
+                                (interfaceMatcher.matchesAny() || interfaceMatcher.matches(interfaceInfo->entry->getFullName())) &&
+                                (towardsMatcher.matchesAny() || linkContainsMatchingHostExcept(linkInfo, &towardsMatcher, hostModule)))
+                        {
+                            interfaceInfo->configure = configureAttr;
+                            if (haveAddressConstraint) {
+                                interfaceInfo->address = address;
+                                interfaceInfo->addressSpecifiedBits = addressSpecifiedBits;
+                            }
+                            if (haveNetmaskConstraint) {
+                                interfaceInfo->netmask = netmask;
+                                interfaceInfo->netmaskSpecifiedBits = netmaskSpecifiedBits;
+                            }
+                            interfacesSeen.insert(interfaceInfo);
+                            EV << hostModule->getFullPath() << ":" << interfaceInfo->entry->getFullName() << endl;
+                        }
+                    }
+                }
+            }
         }
         catch (std::exception& e)
         {
@@ -354,27 +351,30 @@ void NewNetworkConfigurator::handleMessage(cMessage *msg)
 
 void NewNetworkConfigurator::dumpAddresses(cTopology& topo, NetworkInfo& networkInfo)
 {
-	for (int i = 0; i < networkInfo.links.size(); i++)
-	{
-		EV << "Link " << i << "\n";
-	    const LinkInfo* linkInfo = networkInfo.links[i];
-		for (int j = 0; j < linkInfo->interfaces.size(); j++)
-		{
-			const InterfaceEntry *ie = linkInfo->interfaces[j]->entry;
-			cModule *host = dynamic_cast<cModule *>(ie->getInterfaceTable())->getParentModule();
-			EV << "    " << host->getFullName() << " / " << ie->getName() << " " << ie->info() << "\n";
-		}
-	}
+    for (int i = 0; i < networkInfo.links.size(); i++)
+    {
+        EV << "Link " << i << "\n";
+        const LinkInfo* linkInfo = networkInfo.links[i];
+        for (int j = 0; j < linkInfo->interfaces.size(); j++)
+        {
+            const InterfaceEntry *ie = linkInfo->interfaces[j]->entry;
+            cModule *host = dynamic_cast<cModule *>(ie->getInterfaceTable())->getParentModule();
+            EV << "    " << host->getFullName() << " / " << ie->getName() << " " << ie->info() << "\n";
+        }
+    }
 }
 
 void NewNetworkConfigurator::dumpRoutes(cTopology& topo, NetworkInfo& networkInfo)
 {
-    for (int i = 0; i < topo.getNumNodes(); i++)
+    for (int i=0; i<topo.getNumNodes(); i++)
     {
-        EV << "Node " << i << "\n";
         cTopology::Node *node = topo.getNode(i);
         NodeInfo *nodeInfo = networkInfo.nodes[node];
-        nodeInfo->rt->printRoutingTable();
+        // skip bus types
+        if (nodeInfo->isIPNode && nodeInfo->rt) {
+            EV << "Node " << nodeInfo->module->getFullPath() << "\n";
+            nodeInfo->rt->printRoutingTable();
+        }
     }
 }
 
@@ -424,7 +424,6 @@ static uint32 getPackedBits(uint32 value, uint32 valueMask)
             packedValueIndex++;
         }
     }
-    EV << "*** " << IPv4Address(value) << " : " << IPv4Address(valueMask) << " -> " << IPv4Address(packedValue) << "\n";
     return packedValue;
 }
 
@@ -539,7 +538,7 @@ void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& netwo
             uint32 networkNetmask = 0; // netmask for the network (e.g. 255.255.255.0)
             for (netmaskLength = maximumNetmaskLength; netmaskLength >= minimumNetmaskLength; netmaskLength--) {
                 networkNetmask = ((1 << netmaskLength) - 1) << (32 - netmaskLength);
-                EV << "Trying network netmask: " << IPv4Address(networkNetmask) << "\n";
+                EV << "Trying network netmask: " << IPv4Address(networkNetmask) << " : " << netmaskLength << "\n";
                 networkAddress = mergedAddress & mergedAddressSpecifiedBits & networkNetmask;
                 uint32 networkAddressUnspecifiedBits = ~mergedAddressSpecifiedBits & networkNetmask; // 1 means the network address unspecified
                 uint32 networkAddressUnspecifiedPartMaximum = 0;
@@ -562,8 +561,9 @@ void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& netwo
                     for (int i = 0; i < assignedInterfaceAddresses.size(); i++)
                         if ((assignedInterfaceAddresses[i].getInt() & networkNetmask) == networkAddress)
                             interfaceCount++;
+                    EV << "Matching interface count: " << interfaceCount << "\n";
                     // check if there's enough room for the interface addresses
-                    if ((1 << ( 32 - netmaskLength)) >= interfaceCount + compatibleInterfaceCount)
+                    if ((1 << (32 - netmaskLength)) >= interfaceCount + compatibleInterfaceCount)
                         goto found;
                 }
             }
@@ -921,10 +921,14 @@ void NewNetworkConfigurator::fillRoutingTables(cTopology& topo, NetworkInfo& net
             IRoutingTable *rt = sourceNodeInfo->rt;
             IPv4Route *route = new IPv4Route();
             IPv4InterfaceData *ipv4Data = destInterface->ipv4Data();
-            route->setDestination(IPv4Address(ipv4Data->getIPAddress().getInt() & ipv4Data->getNetmask().getInt()));
-            route->setNetmask(ipv4Data->getNetmask());
+            IPv4Address destAddress = ipv4Data->getIPAddress();
+            IPv4Address destNetmask = ipv4Data->getNetmask();
+            IPv4Address gatewayAddress = nextHopInterface->ipv4Data()->getIPAddress();
+            route->setDestination(destAddress.getInt() & destNetmask.getInt());
+            route->setNetmask(destNetmask);
             route->setInterface(sourceInterface);
-            route->setGateway(nextHopInterface->ipv4Data()->getIPAddress());
+            if ((destAddress.getInt() & destNetmask.getInt()) != (gatewayAddress.getInt() & destNetmask.getInt()))
+                route->setGateway(gatewayAddress);
             route->setType(IPv4Route::DIRECT);
             route->setSource(IPv4Route::MANUAL);
             rt->addRoute(route);
@@ -934,6 +938,66 @@ void NewNetworkConfigurator::fillRoutingTables(cTopology& topo, NetworkInfo& net
     }
 }
 
+// TODO: check if two subsequent routes can be swapped
+// TODO: check if two subsequent routes complement each other
+// TODO: check if a route is covered by the preceding one
 void NewNetworkConfigurator::optimizeRoutingTables(cTopology& topo, NetworkInfo& networkInfo)
 {
+    // check if two routes can be aggressively merged without changing the meaning of all other routes
+    // the merged route will have the longest shared prefix with the original two routes
+    for (int nodeIndex = 0; nodeIndex < topo.getNumNodes(); nodeIndex++)
+    {
+        cTopology::Node *node = topo.getNode(nodeIndex);
+        NodeInfo *nodeInfo = networkInfo.nodes[node];
+        if (nodeInfo->isIPNode) {
+            IRoutingTable *rt = nodeInfo->rt;
+            restart:
+            int routeCount = rt->getNumRoutes();
+            for (int i = 0; i < routeCount; i++) {
+                IPv4Route *routeI = rt->getRoute(i);
+                for (int j = i + 1; j  < routeCount; j++) {
+                    IPv4Route *routeJ = rt->getRoute(j);
+                    if (routeI->getType() == routeJ->getType() && routeI->getSource() == routeJ->getSource() && routeI->getMetric() == routeJ->getMetric() &&
+                        routeI->getGateway() == routeJ->getGateway() && routeI->getInterface() == routeJ->getInterface())
+                    {
+                        IPv4Route *route = new IPv4Route();
+                        uint32 netmask = 0;
+                        uint32 destination = 0;
+                        for (int bitIndex = 31; bitIndex >= 0; bitIndex--) {
+                            uint32 mask = 1 << bitIndex;
+                            if ((routeI->getDestination().getInt() & mask) == (routeJ->getDestination().getInt() & mask) &&
+                                (routeI->getNetmask().getInt() & mask) != 0 && (routeJ->getNetmask().getInt() & mask) != 0)
+                            {
+                                netmask |= mask;
+                                destination |= routeI->getDestination().getInt() & mask;
+                            }
+                            else
+                                break;
+                        }
+                        route->setDestination(destination);
+                        route->setNetmask(netmask);
+                        route->setInterface(routeI->getInterface());
+                        route->setGateway(routeI->getGateway());
+                        route->setType(routeI->getType());
+                        route->setSource(routeI->getSource());
+                        for (int k = 0; k  < routeCount; k++) {
+                            IPv4Route *routeK = rt->getRoute(k);
+                            // TODO: factor with the other big if condition
+                            if (routeI->getType() != routeK->getType() || routeI->getSource() != routeK->getSource() || routeI->getMetric() != routeK->getMetric() ||
+                                routeI->getGateway() != routeK->getGateway() || routeI->getInterface() != routeK->getInterface())
+                            {
+                                if ((routeK->getDestination().getInt() & route->getNetmask().getInt()) == (route->getDestination().getInt() & route->getNetmask().getInt()))
+                                    goto next;
+                            }
+                        }
+                        rt->removeRoute(routeI);
+                        rt->removeRoute(routeJ);
+                        rt->addRoute(route);
+                        goto restart;
+                    }
+                    next:;
+                }
+            }
+        }
+    }
 }

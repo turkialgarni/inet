@@ -44,6 +44,7 @@ simple NewNetworkConfigurator
         xml config = default(xml("<empty/>"));
         bool addStaticRoutes = default(true);
         bool useDefaultRoutes = default(true);
+        bool optimizeRoutes = default(true);
         bool dumpAddresses = default(false);
         bool dumpRoutes = default(false);
 }

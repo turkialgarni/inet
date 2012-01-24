@@ -246,10 +246,10 @@ void RoutingTable::printRoutingTable() const
 {
     EV << "-- Routing table --\n";
     ev.printf("%-16s %-16s %-16s %-3s %s\n",
-              "Destination", "Gateway", "Netmask", "Iface");
+              "Destination", "Gateway", "Netmask", "Iface", "Metric");
 
     for (int i=0; i<getNumRoutes(); i++)
-        EV << getRoute(i)->detailedInfo() << "\n";
+        EV << getRoute(i)->info() << "\n";
     EV << "\n";
 }
 
