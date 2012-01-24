@@ -234,15 +234,32 @@ void NewNetworkConfigurator::readAddressConfiguration(cXMLElement *root, cTopolo
 {
     std::set<InterfaceInfo*> interfacesSeen;
     cXMLElementList interfaceElements = root->getChildrenByTagName("interface");
+
+    // If there is no XML configuration, all interfaces are configured with some default address range
+    // (see InterfaceInfo ctor); however, if there is at least one <interface> element, then there is
+    // no such default, all interfaces to be configured should be covered with <interface> elements.
+    if (interfaceElements.size() > 0)
+    {
+        // set configure=false for on all interfaces
+        for (int i = 0; i < networkInfo.links.size(); i++)
+        {
+            LinkInfo *linkInfo = networkInfo.links[i];
+            for (int j = 0; j < linkInfo->interfaces.size(); j++)
+            {
+                InterfaceInfo *interfaceInfo = linkInfo->interfaces[j];
+                interfaceInfo->configure = false;
+            }
+        }
+    }
     for (int i = 0; i < interfaceElements.size(); i++)
     {
         cXMLElement *interfaceElement = interfaceElements[i];
         const char *hostAttr = interfaceElement->getAttribute("hosts");  // "host* router[0..3]"
         const char *interfaceAttr = interfaceElement->getAttribute("names"); // i.e. interface names, like "eth* ppp0"
         const char *towardsAttr = interfaceElement->getAttribute("towards"); // neighbor host names, like "ap switch"
-        const char *configureAttr = interfaceElement->getAttribute("configure"); // "true" (default) or "false"
         const char *addressAttr = interfaceElement->getAttribute("address"); // "10.0.x.x"
         const char *netmaskAttr = interfaceElement->getAttribute("netmask"); // "255.255.x.x"
+        const char *multicastGroupsAttr = interfaceElement->getAttribute("multicastgroups"); // "224.0.0.1 224.0.1.33"
 
         try
         {
@@ -251,19 +268,24 @@ void NewNetworkConfigurator::readAddressConfiguration(cXMLElement *root, cTopolo
             Matcher interfaceMatcher(interfaceAttr);
             Matcher towardsMatcher(towardsAttr);
 
-            bool doConfigure = strToBool(configureAttr, true);
-
             // parse address/netmask constraints
             bool haveAddressConstraint = isNotEmpty(addressAttr);
             bool haveNetmaskConstraint = isNotEmpty(netmaskAttr);
-            if (!doConfigure && (haveAddressConstraint || haveNetmaskConstraint))
-                throw cRuntimeError("configure attribute is false but entry has address or netmask attributes, too");
 
             uint32_t address, addressSpecifiedBits, netmask, netmaskSpecifiedBits;
             if (haveAddressConstraint)
                 parseAddressAndSpecifiedBits(addressAttr, address, addressSpecifiedBits);
             if (haveNetmaskConstraint)
                 parseAddressAndSpecifiedBits(netmaskAttr, netmask, netmaskSpecifiedBits);
+
+            std::vector<IPv4Address> multicastGroups;
+            cStringTokenizer tokenizer(multicastGroupsAttr);
+            while (tokenizer.hasMoreTokens()) {
+                IPv4Address addr = IPv4Address(tokenizer.nextToken());
+                if (!addr.isMulticast())
+                    throw cRuntimeError("non-multicast address %s found in the multicastgroups attribute", addr.str().c_str());
+                multicastGroups.push_back(addr);
+            }
 
             // configure address/netmask constraints on matching interfaces
             for (int i = 0; i < networkInfo.links.size(); i++)
@@ -283,15 +305,19 @@ void NewNetworkConfigurator::readAddressConfiguration(cXMLElement *root, cTopolo
                                 (interfaceMatcher.matchesAny() || interfaceMatcher.matches(interfaceInfo->entry->getFullName())) &&
                                 (towardsMatcher.matchesAny() || linkContainsMatchingHostExcept(linkInfo, &towardsMatcher, hostModule)))
                         {
-                            interfaceInfo->configure = configureAttr;
-                            if (haveAddressConstraint) {
+                            // unicast address constraints
+                            interfaceInfo->configure = haveAddressConstraint;
+                            if (interfaceInfo->configure) {
                                 interfaceInfo->address = address;
                                 interfaceInfo->addressSpecifiedBits = addressSpecifiedBits;
+                                if (haveNetmaskConstraint) {
+                                    interfaceInfo->netmask = netmask;
+                                    interfaceInfo->netmaskSpecifiedBits = netmaskSpecifiedBits;
+                                }
                             }
-                            if (haveNetmaskConstraint) {
-                                interfaceInfo->netmask = netmask;
-                                interfaceInfo->netmaskSpecifiedBits = netmaskSpecifiedBits;
-                            }
+                            // multicast addresses (note: even if configure==false! multicast addresses are treated differently)
+                            for (int k = 0; k < multicastGroups.size(); k++)
+                                interfaceInfo->entry->ipv4Data()->joinMulticastGroup(multicastGroups[k]);
                             interfacesSeen.insert(interfaceInfo);
                             EV << hostModule->getFullPath() << ":" << interfaceInfo->entry->getFullName() << endl;
                         }
