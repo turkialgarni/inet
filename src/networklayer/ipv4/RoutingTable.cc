@@ -562,6 +562,11 @@ void RoutingTable::internalAddRoute(IPv4Route *entry)
     entry->setRoutingTable(this);
 }
 
+int RoutingTable::getRouteIndex(IPv4Route *entry) const
+{
+    return upper_bound(routes.begin(), routes.end(), entry, routeLessThan) - routes.begin();
+}
+
 void RoutingTable::addRoute(IPv4Route *entry)
 {
     Enter_Method("addRoute(...)");

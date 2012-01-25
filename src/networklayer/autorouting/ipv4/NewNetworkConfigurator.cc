@@ -51,15 +51,9 @@ void NewNetworkConfigurator::initialize(int stage)
         // read and configure manual routes from the XML configuration
         addManualRoutes(par("config").xmlValue(), networkInfo); // TODO use 2 separate XML files? "interfaceConfig", "manualRoutes" parameters
 
-        if (par("addStaticRoutes").boolValue()) {
-            // add default routes to hosts (nodes with a single attachment);
-            // also remember result in nodeInfo[].usesDefaultRoute
-            if (par("useDefaultRoutes").boolValue())
-                addDefaultRoutes(topo, networkInfo);
-
-            // calculate shortest paths, and add corresponding static routes
+        // calculate shortest paths, and add corresponding static routes
+        if (par("addStaticRoutes").boolValue())
             fillRoutingTables(topo, networkInfo);
-        }
 
         // optimize routing tables
         if (par("optimizeRoutes").boolValue())
@@ -414,7 +408,7 @@ inline int getRepresentationBitCount(uint32 count)
 }
 
 // 0 means the most significant bit
-static int getMostSignificantBitIndex(uint32 value, uint32 bitValue)
+static int getMostSignificantBitIndex(uint32 value, uint32 bitValue, int defaultIndex)
 {
     int bitIndex = 0;
     for (int bitIndex = 31; bitIndex >= 0; bitIndex--) {
@@ -422,11 +416,11 @@ static int getMostSignificantBitIndex(uint32 value, uint32 bitValue)
         if ((value & mask) == (bitValue << bitIndex))
             return bitIndex;
     }
-    return -1;
+    return defaultIndex;
 }
 
 // 0 means the most significant bit
-static int getLeastSignificantBitIndex(uint32 value, uint32 bitValue)
+static int getLeastSignificantBitIndex(uint32 value, uint32 bitValue, int defaultIndex)
 {
     int bitIndex = 0;
     for (int bitIndex = 0; bitIndex < 32; bitIndex++) {
@@ -434,7 +428,7 @@ static int getLeastSignificantBitIndex(uint32 value, uint32 bitValue)
         if ((value & mask) == (bitValue << bitIndex))
             return bitIndex;
     }
-    return -1;
+    return defaultIndex;
 }
 
 // get packed bits from value specified by mask
@@ -545,11 +539,9 @@ void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& netwo
             // STEP 2.
             // determine the valid range of netmask length by searching from left to right the last 1 and the first 0 bits
             // also consider the incompatible bits of the address to limit the range of valid netmasks accordingly
-            // the result of step 2 is the following:
-            // TODO: check for -1 return values
-            int minimumNetmaskLength = 32 - getLeastSignificantBitIndex(mergedNetmask & mergedNetmaskSpecifiedBits, 1); // 0 means 0.0.0.0, 32 means 255.255.255.255
-            int maximumNetmaskLength = 31 - getMostSignificantBitIndex(~mergedNetmask & mergedNetmaskSpecifiedBits, 1); // 0 means 0.0.0.0, 32 means 255.255.255.255
-            maximumNetmaskLength = std::min(maximumNetmaskLength, 31 - getMostSignificantBitIndex(mergedAddressIncompatibleBits, 1));
+            int minimumNetmaskLength = 32 - getLeastSignificantBitIndex(mergedNetmask & mergedNetmaskSpecifiedBits, 1, 32); // 0 means 0.0.0.0, 32 means 255.255.255.255
+            int maximumNetmaskLength = 31 - getMostSignificantBitIndex(~mergedNetmask & mergedNetmaskSpecifiedBits, 1, -1); // 0 means 0.0.0.0, 32 means 255.255.255.255
+            maximumNetmaskLength = std::min(maximumNetmaskLength, 31 - getMostSignificantBitIndex(mergedAddressIncompatibleBits, 1, -1));
             // make sure there are enough bits to configure a unique address for all interface
             // the +2 means that all-0 and all-1 addresses are ruled out
             int compatibleInterfaceCount = compatibleInterfaces.size() + 2;
@@ -570,17 +562,20 @@ void NewNetworkConfigurator::assignAddresses(cTopology& topo, NetworkInfo& netwo
                 uint32 networkAddressUnspecifiedPartMaximum = 0;
                 for (int i = 0; i < assignedNetworkAddresses.size(); i++) {
                     uint32 assignedNetworkAddress = assignedNetworkAddresses[i].getInt();
+                    uint32 assignedNetworkNetmask = assignedNetworkNetmasks[i].getInt();
+                    uint32 assignedNetworkAddressMaximum = assignedNetworkAddress | ~assignedNetworkNetmask;
                     EV << "Checking against assigned network address " << IPv4Address(assignedNetworkAddress) << "\n";
                     if ((assignedNetworkAddress & ~networkAddressUnspecifiedBits) == (networkAddress & ~networkAddressUnspecifiedBits)) {
-                        uint32 assignedAddressUnspecifiedPart = getPackedBits(assignedNetworkAddress, networkAddressUnspecifiedBits);
+                        uint32 assignedAddressUnspecifiedPart = getPackedBits(assignedNetworkAddressMaximum, networkAddressUnspecifiedBits);
                         if (assignedAddressUnspecifiedPart > networkAddressUnspecifiedPartMaximum)
                             networkAddressUnspecifiedPartMaximum = assignedAddressUnspecifiedPart;
                     }
                 }
-                uint32 networkAddressUnspecifiedPartLimit = getPackedBits(0xFFFFFFFF, networkAddressUnspecifiedBits);
-                EV << "Couting from: " << networkAddressUnspecifiedPartMaximum << " to: " << networkAddressUnspecifiedPartLimit << "\n";
-                for (; networkAddressUnspecifiedPartMaximum <= networkAddressUnspecifiedPartLimit; networkAddressUnspecifiedPartMaximum++) {
-                    networkAddress = setPackedBits(networkAddress, networkAddressUnspecifiedBits, networkAddressUnspecifiedPartMaximum);
+                // TODO: fix this +1
+                uint32 networkAddressUnspecifiedPartLimit = getPackedBits(0xFFFFFFFF, networkAddressUnspecifiedBits) + 1;
+                EV << "Counting from: " << networkAddressUnspecifiedPartMaximum + 1 << " to: " << networkAddressUnspecifiedPartLimit << "\n";
+                for (int networkAddressUnspecifiedPart = networkAddressUnspecifiedPartMaximum + 1; networkAddressUnspecifiedPart <= networkAddressUnspecifiedPartLimit; networkAddressUnspecifiedPart++) {
+                    networkAddress = setPackedBits(networkAddress, networkAddressUnspecifiedBits, networkAddressUnspecifiedPart);
                     EV << "Trying network address: " << IPv4Address(networkAddress) << "\n";
                     // count interfaces that have the same address prefix
                     int interfaceCount = 0;
@@ -845,46 +840,6 @@ NewNetworkConfigurator::LinkInfo *NewNetworkConfigurator::findLinkOfInterface(co
     return NULL;
 }
 
-void NewNetworkConfigurator::addDefaultRoutes(cTopology& topo, NetworkInfo& networkInfo)
-{
-    // add default route to nodes with exactly one (non-loopback) interface
-    std::map<cTopology::Node*, NodeInfo*>& nodes = networkInfo.nodes;
-    for (int i=0; i<topo.getNumNodes(); i++)
-    {
-        cTopology::Node *node = topo.getNode(i);
-        NodeInfo *nodeInfo = networkInfo.nodes[node];
-
-        // skip bus types
-        if (!nodeInfo->isIPNode)
-            continue;
-
-        IInterfaceTable *ift = nodeInfo->ift;
-        IRoutingTable *rt = nodeInfo->rt;
-
-        // count non-loopback interfaces
-        int numIntf = 0;
-        InterfaceEntry *ie = NULL;
-        for (int k=0; k<ift->getNumInterfaces(); k++)
-            if (!ift->getInterface(k)->isLoopback())
-                {ie = ift->getInterface(k); numIntf++;}
-
-        nodeInfo->usesDefaultRoute = (numIntf==1);
-        if (numIntf!=1)
-            continue; // only deal with nodes with one interface plus loopback
-
-        EV << "  " << node->getModule()->getFullName() << " has only one (non-loopback) interface, adding default route\n";
-
-        // NOTE: we don't specify the gateway in the default route which may result in extra ARP requests
-        IPv4Route *route = new IPv4Route();
-        route->setDestination(IPv4Address());
-        route->setNetmask(IPv4Address());
-        route->setInterface(ie);
-        route->setType(IPv4Route::REMOTE);
-        route->setSource(IPv4Route::MANUAL);
-        rt->addRoute(route);
-    }
-}
-
 void NewNetworkConfigurator::fillRoutingTables(cTopology& topo, NetworkInfo& networkInfo)
 {
 //TODO it should be configurable (via xml?) which nodes need routing tables to be filled in automatically
@@ -915,8 +870,6 @@ void NewNetworkConfigurator::fillRoutingTables(cTopology& topo, NetworkInfo& net
                 continue;
             if (sourceNode->getNumPaths()==0)
                 continue; // not connected
-            if (sourceNodeInfo->usesDefaultRoute)
-                continue; // already added default route here
 
             // find source output interface
             IInterfaceTable *sourceIFT = sourceNodeInfo->ift;
@@ -964,66 +917,92 @@ void NewNetworkConfigurator::fillRoutingTables(cTopology& topo, NetworkInfo& net
     }
 }
 
-// TODO: check if two subsequent routes can be swapped
-// TODO: check if two subsequent routes complement each other
-// TODO: check if a route is covered by the preceding one
+static bool routesHaveSameTarget(IPv4Route *route1, IPv4Route *route2)
+{
+    return route1->getType() == route2->getType() && route1->getSource() == route2->getSource() && route1->getMetric() == route2->getMetric() &&
+           route1->getGateway() == route2->getGateway() && route1->getInterface() == route2->getInterface();
+}
+
+static bool routesCanBeSwapped(IPv4Route *route1, IPv4Route *route2)
+{
+    if (routesHaveSameTarget(route1, route2))
+        return true;
+    else {
+        uint32 destination1 = route1->getDestination().getInt();
+        uint32 netmask1 = route1->getNetmask().getInt();
+        uint32 destination2 = route2->getDestination().getInt();
+        uint32 netmask2 = route2->getNetmask().getInt();
+        uint32 netmask = std::min(netmask1, netmask2);
+        return (destination1 & netmask) != (destination2 & netmask);
+    }
+}
+
+static bool routesCanBeNeighbors(IRoutingTable *routingTable, int i, int j)
+{
+    int begin = std::min(i, j);
+    int end = std::max(i, j);
+    for (int index = begin; index < end - 1; index++)
+        if (!routesCanBeSwapped(routingTable->getRoute(index), routingTable->getRoute(index + 1)))
+            return false;
+    return true;
+}
+
 void NewNetworkConfigurator::optimizeRoutingTables(cTopology& topo, NetworkInfo& networkInfo)
 {
     // check if two routes can be aggressively merged without changing the meaning of all other routes
     // the merged route will have the longest shared prefix with the original two routes
-    for (int nodeIndex = 0; nodeIndex < topo.getNumNodes(); nodeIndex++)
-    {
+    for (int nodeIndex = 0; nodeIndex < topo.getNumNodes(); nodeIndex++) {
         cTopology::Node *node = topo.getNode(nodeIndex);
         NodeInfo *nodeInfo = networkInfo.nodes[node];
-        if (nodeInfo->isIPNode) {
-            IRoutingTable *rt = nodeInfo->rt;
-            restart:
-            int routeCount = rt->getNumRoutes();
-            for (int i = 0; i < routeCount; i++) {
-                IPv4Route *routeI = rt->getRoute(i);
-                for (int j = i + 1; j  < routeCount; j++) {
-                    IPv4Route *routeJ = rt->getRoute(j);
-                    if (routeI->getType() == routeJ->getType() && routeI->getSource() == routeJ->getSource() && routeI->getMetric() == routeJ->getMetric() &&
-                        routeI->getGateway() == routeJ->getGateway() && routeI->getInterface() == routeJ->getInterface())
+        if (nodeInfo->isIPNode)
+            optimizeRoutingTable(nodeInfo->rt);
+    }
+}
+
+void NewNetworkConfigurator::optimizeRoutingTable(IRoutingTable *routingTable)
+{
+    restart:
+    int routeCount = routingTable->getNumRoutes();
+    for (int i = 0; i < routeCount; i++) {
+        IPv4Route *routeI = routingTable->getRoute(i);
+        for (int j = i + 1; j  < routeCount; j++) {
+            IPv4Route *routeJ = routingTable->getRoute(j);
+            if (routesHaveSameTarget(routeI, routeJ) && routesCanBeNeighbors(routingTable, i, j)) {
+                // determine longest common address prefix and netmask
+                uint32 netmask = 0;
+                uint32 destination = 0;
+                for (int bitIndex = 31; bitIndex >= 0; bitIndex--) {
+                    uint32 mask = 1 << bitIndex;
+                    if ((routeI->getDestination().getInt() & mask) == (routeJ->getDestination().getInt() & mask) &&
+                        (routeI->getNetmask().getInt() & mask) != 0 && (routeJ->getNetmask().getInt() & mask) != 0)
                     {
-                        IPv4Route *route = new IPv4Route();
-                        uint32 netmask = 0;
-                        uint32 destination = 0;
-                        for (int bitIndex = 31; bitIndex >= 0; bitIndex--) {
-                            uint32 mask = 1 << bitIndex;
-                            if ((routeI->getDestination().getInt() & mask) == (routeJ->getDestination().getInt() & mask) &&
-                                (routeI->getNetmask().getInt() & mask) != 0 && (routeJ->getNetmask().getInt() & mask) != 0)
-                            {
-                                netmask |= mask;
-                                destination |= routeI->getDestination().getInt() & mask;
-                            }
-                            else
-                                break;
-                        }
-                        route->setDestination(destination);
-                        route->setNetmask(netmask);
-                        route->setInterface(routeI->getInterface());
-                        route->setGateway(routeI->getGateway());
-                        route->setType(routeI->getType());
-                        route->setSource(routeI->getSource());
-                        for (int k = 0; k  < routeCount; k++) {
-                            IPv4Route *routeK = rt->getRoute(k);
-                            // TODO: factor with the other big if condition
-                            if (routeI->getType() != routeK->getType() || routeI->getSource() != routeK->getSource() || routeI->getMetric() != routeK->getMetric() ||
-                                routeI->getGateway() != routeK->getGateway() || routeI->getInterface() != routeK->getInterface())
-                            {
-                                if ((routeK->getDestination().getInt() & route->getNetmask().getInt()) == (route->getDestination().getInt() & route->getNetmask().getInt()))
-                                    goto next;
-                            }
-                        }
-                        rt->removeRoute(routeI);
-                        rt->removeRoute(routeJ);
-                        rt->addRoute(route);
-                        goto restart;
+                        netmask |= mask;
+                        destination |= routeI->getDestination().getInt() & mask;
                     }
-                    next:;
+                    else
+                        break;
                 }
+                // create the merge route
+                IPv4Route *route = new IPv4Route();
+                route->setDestination(destination);
+                route->setNetmask(netmask);
+                route->setInterface(routeI->getInterface());
+                route->setGateway(routeI->getGateway());
+                route->setType(routeI->getType());
+                route->setSource(routeI->getSource());
+                int index = routingTable->getRouteIndex(route);
+                // check if the route does not conflict with others (i.e. original routes and the merged one could be neighbors)
+                if (routesCanBeNeighbors(routingTable, i, index) && routesCanBeNeighbors(routingTable, j, index)) {
+                    // replace the two routes with the merged route
+                    routingTable->addRoute(route);
+                    routingTable->removeRoute(routeI);
+                    routingTable->removeRoute(routeJ);
+                    goto restart;
+                }
+                else
+                    delete route;
             }
+            nextPair:;
         }
     }
 }

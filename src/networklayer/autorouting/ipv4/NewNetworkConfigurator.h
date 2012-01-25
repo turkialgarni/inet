@@ -54,12 +54,11 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
     };
 
     struct NodeInfo {
-        NodeInfo() {module = NULL; isIPNode = false; ift = NULL; rt = NULL; usesDefaultRoute = false;}
+        NodeInfo() {module = NULL; isIPNode = false; ift = NULL; rt = NULL;}
         cModule *module;
         bool isIPNode;
         IInterfaceTable *ift;
         IRoutingTable *rt;
-        bool usesDefaultRoute;
     };
 
     struct LinkInfo {
@@ -94,10 +93,10 @@ class INET_API NewNetworkConfigurator : public cSimpleModule
     virtual void extractTopology(cTopology& topo, NetworkInfo& networkInfo);
     virtual void readAddressConfiguration(cXMLElement *root, cTopology& topo, NetworkInfo& networkInfo);
     virtual void assignAddresses(cTopology& topo, NetworkInfo& networkInfo);
-    virtual void addDefaultRoutes(cTopology& topo, NetworkInfo& networkInfo);
     virtual void addManualRoutes(cXMLElement *root, NetworkInfo& networkInfo);
     virtual void fillRoutingTables(cTopology& topo, NetworkInfo& networkInfo);
     virtual void optimizeRoutingTables(cTopology& topo, NetworkInfo& networkInfo);
+    virtual void optimizeRoutingTable(IRoutingTable *routingTable);
     virtual void dumpAddresses(cTopology& topo, NetworkInfo& networkInfo);
     virtual void dumpRoutes(cTopology& topo, NetworkInfo& networkInfo);
 

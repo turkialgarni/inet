@@ -264,14 +264,11 @@ void InterfaceTable::interfaceChanged(InterfaceEntry *entry, int category)
         {
             cModule *host = getParentModule();
             cGate *outputGate = host->gate(outputGateId);
-            if (outputGate->getChannel())
-            {
-                char buf[32];
-                sprintf(buf, "%s%d\n%s/%d", outputGate->getBaseName(), outputGate->getIndex(), entry->ipv4Data()->getIPAddress().str().c_str(), entry->ipv4Data()->getNetmask().getNetmaskLength());
-                cDisplayString& displayString = outputGate->getChannel()->getDisplayString();
-                displayString.setTagArg("t", 0, buf);
-                displayString.setTagArg("t", 1, "l");
-            }
+            char buf[32];
+            sprintf(buf, "%s%d\n%s/%d", outputGate->getBaseName(), outputGate->getIndex(), entry->ipv4Data()->getIPAddress().str().c_str(), entry->ipv4Data()->getNetmask().getNetmaskLength());
+            cDisplayString& displayString = outputGate->getDisplayString();
+            displayString.setTagArg("t", 0, buf);
+            displayString.setTagArg("t", 1, "l");
         }
     }
 #endif

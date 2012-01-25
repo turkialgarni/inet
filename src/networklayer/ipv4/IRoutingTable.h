@@ -157,6 +157,11 @@ class INET_API IRoutingTable
     virtual IPv4Route *getDefaultRoute() const = 0;
 
     /**
+     * Returns the index where the given route would be inserted.
+     */
+    virtual int getRouteIndex(IPv4Route *entry) const = 0;
+
+    /**
      * Adds a route to the routing table. Routes are allowed to be modified
      * while in the routing table. (There is a notification mechanism that
      * allows routing table internals to be updated on a routing entry change.)
