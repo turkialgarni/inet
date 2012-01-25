@@ -34,11 +34,18 @@ Define_Module( InterfaceTable );
 
 #define INTERFACEIDS_START  100
 
+#define LL INT64_PRINTF_FORMAT   // for eventnumber_t
+
 std::ostream& operator<<(std::ostream& os, const InterfaceEntry& e)
 {
     os << e.info();
     return os;
 };
+
+
+extern FILE *routingLogFile; // in RoutingTable
+
+void ensureRoutingLogFileOpen();  // in RoutingTable
 
 
 InterfaceTable::InterfaceTable()
@@ -165,6 +172,16 @@ void InterfaceTable::addInterface(InterfaceEntry *entry, cModule *ifmod)
     if (ifmod)
         discoverConnectingGates(entry, ifmod);
 
+    // time, moduleId, ifname, address
+    ensureRoutingLogFileOpen();
+    fprintf(routingLogFile, "+I  %"LL"d  %s  %d  %s\n",
+            simulation.getEventNumber(),
+            SIMTIME_STR(simTime()),
+            getParentModule()->getId(),
+            entry->getName()
+            );
+    fflush(routingLogFile);
+
     nb->fireChangeNotification(NF_INTERFACE_CREATED, entry);
 }
 
@@ -212,6 +229,16 @@ void InterfaceTable::deleteInterface(InterfaceEntry *entry)
     if (entry != getInterfaceById(id))
         throw cRuntimeError(this, "deleteInterface(): interface '%s' not found in interface table", entry->getName());
 
+    // time, moduleId, ifname (note: no address yet; entry->ipv4Data() is still NULL at this point)
+    ensureRoutingLogFileOpen();
+    fprintf(routingLogFile, "-I  %"LL"d  %s  %d  %s\n",
+            simulation.getEventNumber(),
+            SIMTIME_STR(simTime()),
+            getParentModule()->getId(),
+            entry->getName()
+            );
+    fflush(routingLogFile);
+
     nb->fireChangeNotification(NF_INTERFACE_DELETED, entry);  // actually, only going to be deleted
 
     idToInterface[id - INTERFACEIDS_START] = NULL;
@@ -228,7 +255,6 @@ void InterfaceTable::invalidateTmpInterfaceList()
 
 void InterfaceTable::interfaceChanged(InterfaceEntry *entry, int category)
 {
-    nb->fireChangeNotification(category, entry);
 
 #ifdef WITH_IPv4
     if (ev.isGUI())
@@ -250,6 +276,21 @@ void InterfaceTable::interfaceChanged(InterfaceEntry *entry, int category)
     }
 #endif
 
+    // time, moduleId, ifname, address
+    if (entry->ipv4Data())
+    {
+        ensureRoutingLogFileOpen();
+        fprintf(routingLogFile, "~I  %"LL"d  %s  %d  %s  %s\n",
+                simulation.getEventNumber(),
+                SIMTIME_STR(simTime()),
+                getParentModule()->getId(),
+                entry->getName(),
+                entry->ipv4Data()->getIPAddress().str().c_str()
+        );
+        fflush(routingLogFile);
+    }
+
+    nb->fireChangeNotification(category, entry);
 }
 
 InterfaceEntry *InterfaceTable::getInterfaceByNodeOutputGateId(int id)
