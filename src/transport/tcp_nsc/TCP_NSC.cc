@@ -23,10 +23,12 @@
 #include "headers/defs.h"   // for endian macros
 
 #ifdef WITH_IPv4
+#include "ICMPMessage_m.h"
 #include "IPv4ControlInfo.h"
 #endif
 
 #ifdef WITH_IPv6
+#include "ICMPv6Message_m.h"
 #include "IPv6ControlInfo.h"
 #endif
 
@@ -616,10 +618,25 @@ void TCP_NSC::handleMessage(cMessage *msgP)
     }
     else if (msgP->arrivedOn("ipIn") || msgP->arrivedOn("ipv6In"))
     {
-        tcpEV << this << ": handle msg: " << msgP->getName() << "\n";
-        // must be a TCPSegment
-        TCPSegment *tcpseg = check_and_cast<TCPSegment *>(msgP);
-        handleIpInputMessage(tcpseg);
+        if (false
+#ifdef WITH_IPv4
+                || dynamic_cast<ICMPMessage *>(msgP)
+#endif
+#ifdef WITH_IPv6
+                || dynamic_cast<ICMPv6Message *>(msgP)
+#endif
+            )
+        {
+            tcpEV << "ICMP error received -- discarding\n"; // FIXME can ICMP packets really make it up to TCP???
+            delete msgP;
+        }
+        else
+        {
+            tcpEV << this << ": handle msg: " << msgP->getName() << "\n";
+            // must be a TCPSegment
+            TCPSegment *tcpseg = check_and_cast<TCPSegment *>(msgP);
+            handleIpInputMessage(tcpseg);
+        }
     }
     else // must be from app
     {
