@@ -300,7 +300,10 @@ network IPv4LargeNet
         routerA.ethg++ <--> cable <--> routerB.ethg++;
         routerB.ethg++ <--> cable <--> routerC.ethg++;
         routerC.ethg++ <--> cable <--> routerD.ethg++;
-        routerB.ethg++ <--> cable <--> routerBB[4].ethg++;
+        routerD.ethg++ <--> cable <--> routerA.ethg++;
+        routerB.ethg++ <--> cable <--> routerBB[0].ethg++;
+        routerD.ethg++ <--> cable <--> routerBB[n/2].ethg++;
+        routerBB[0].ethg++ <--> cable <--> routerBB[n-1].ethg++;
 
 }
 
