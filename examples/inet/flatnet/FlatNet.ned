@@ -42,7 +42,10 @@ network FlatNet
             datarate = 10Mbps;
         }
     submodules:
-        configurator: NewNetworkConfigurator;
+        configurator: NewNetworkConfigurator {
+            parameters:
+                config=xml("<config><interface hosts='*' address='192.168.x.x' netmask='255.255.0.0'/></config>");
+        }
         rte[57]: Router {
             parameters:
                 @display("is=vs");

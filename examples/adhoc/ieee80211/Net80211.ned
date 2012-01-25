@@ -37,6 +37,7 @@ network Net80211
                 @display("p=60,50");
         }
         configurator: NewNetworkConfigurator {
+            config=xml("<config><interface hosts='*' address='192.168.x.x' netmask='255.255.0.0'/></config>");
             @display("p=140,50");
         }
 }

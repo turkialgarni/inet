@@ -61,7 +61,7 @@ network VoIPToolTrafficTest
         }
         configurator: NewNetworkConfigurator {
             parameters:
-                config=xml("<config><interface hosts='*' address='10.x.x.x' netmask='255.x.x.x'/></config>");
+                config=xml("<config><interface hosts='*' address='10.0.x.x' netmask='255.255.x.x'/></config>");
                 @display("p=44,19;i=block/cogwheel_s");
         }
         host1: StandardHost {

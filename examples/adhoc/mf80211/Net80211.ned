@@ -41,6 +41,7 @@ network Net80211
         }
         configurator: NewNetworkConfigurator {
             parameters:
+                config=xml("<config><interface hosts='*' address='192.168.x.x' netmask='255.255.0.0'/></config>");
                 @display("p=140,50");
         }
 }
