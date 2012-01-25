@@ -6,7 +6,7 @@
 
 package inet.examples.httptools.socket.pairsocket;
 
-import inet.networklayer.autorouting.ipv4.FlatNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
 import inet.nodes.inet.StandardHost;
 import inet.world.httptools.HttpController;
 
@@ -23,12 +23,11 @@ network HttpSockPair
                 datarate = 1000Mbps;
         }
     submodules:
-        configurator: FlatNetworkConfigurator {
+        configurator: NewNetworkConfigurator {
             parameters:
                 //                moduleTypes = "StandardHost";
                 //                nonIPModuleTypes = "";
-                networkAddress = "145.236.0.0";
-                netmask = "255.255.0.0";
+                config=xml("<config><interface hosts='*' address='145.236.x.x' netmask='255.255.0.0'/></config>");
                 @display("i=block/cogwheel");
         }
         controller: HttpController {

@@ -31,7 +31,7 @@
 
 package inet.examples.httptools.socket.tenserverssocket;
 
-import inet.networklayer.autorouting.ipv4.FlatNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
 import inet.nodes.inet.Router;
 import inet.nodes.inet.StandardHost;
 import inet.world.httptools.HttpController;
@@ -56,12 +56,11 @@ network Http10Servers
         double numclients @prompt("Number of clients") = default(10);
         @display("bgb=939,624");
     submodules:
-        configurator: FlatNetworkConfigurator {
+        configurator: NewNetworkConfigurator {
             parameters:
                 //                moduleTypes = "Router StandardHost";
                 //                nonIPModuleTypes = "";
-                networkAddress = "145.236.0.0";
-                netmask = "255.255.0.0";
+                config=xml("<config><interface hosts='*' address='145.236.x.x' netmask='255.255.0.0'/></config>");
                 @display("p=58,79;i=block/cogwheel");
         }
         controller: HttpController {

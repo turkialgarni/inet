@@ -23,7 +23,7 @@ package inet.examples.adhoc.mf80211;
 
 import inet.world.radio.ChannelControl;
 import inet.nodes.mf80211.MFMobileHost;
-import inet.networklayer.autorouting.ipv4.FlatNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
 
 
 network Net80211
@@ -39,7 +39,7 @@ network Net80211
             parameters:
                 @display("p=60,50");
         }
-        configurator: FlatNetworkConfigurator {
+        configurator: NewNetworkConfigurator {
             parameters:
                 @display("p=140,50");
         }

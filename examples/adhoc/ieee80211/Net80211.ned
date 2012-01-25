@@ -18,7 +18,7 @@
 
 package inet.examples.adhoc.ieee80211;
 
-import inet.networklayer.autorouting.ipv4.FlatNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
 import inet.nodes.inet.AdhocHost;
 import inet.world.radio.ChannelControl;
 
@@ -36,7 +36,7 @@ network Net80211
             parameters:
                 @display("p=60,50");
         }
-        configurator: FlatNetworkConfigurator {
+        configurator: NewNetworkConfigurator {
             @display("p=140,50");
         }
 }
