@@ -35,6 +35,8 @@
 
 Define_Module(RoutingTable);
 
+Register_PerRunConfigOption(CFGID_ROUTINGLOG_FILE, "routinglog-file", CFG_FILENAME, "${resultdir}/${configname}-${runnumber}.rt", "Name of the routing log file to generate.");
+
 #define LL INT64_PRINTF_FORMAT  // for eventnumber_t
 
 std::ostream& operator<<(std::ostream& os, const IPv4Route& e)
@@ -48,7 +50,7 @@ FILE *routingLogFile = NULL;
 
 void ensureRoutingLogFileOpen() {
     if (routingLogFile == NULL) {
-        routingLogFile = fopen("routinglog.rt", "w");
+        routingLogFile = fopen(ev.getConfig()->getAsFilename(CFGID_ROUTINGLOG_FILE).c_str(), "w");
         ASSERT(routingLogFile);
     }
 }

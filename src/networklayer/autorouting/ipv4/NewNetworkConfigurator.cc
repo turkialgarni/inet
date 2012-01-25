@@ -899,14 +899,12 @@ void NewNetworkConfigurator::fillRoutingTables(cTopology& topo, NetworkInfo& net
             // add route
             IRoutingTable *rt = sourceNodeInfo->rt;
             IPv4Route *route = new IPv4Route();
-            IPv4InterfaceData *ipv4Data = destInterface->ipv4Data();
-            IPv4Address destAddress = ipv4Data->getIPAddress();
-            IPv4Address destNetmask = ipv4Data->getNetmask();
+            IPv4Address destAddress = destInterface->ipv4Data()->getIPAddress();
             IPv4Address gatewayAddress = nextHopInterface->ipv4Data()->getIPAddress();
-            route->setDestination(destAddress.getInt() & destNetmask.getInt());
-            route->setNetmask(destNetmask);
+            route->setDestination(destAddress);
+            route->setNetmask(IPv4Address::ALLONES_ADDRESS);
             route->setInterface(sourceInterface);
-            if ((destAddress.getInt() & destNetmask.getInt()) != (gatewayAddress.getInt() & destNetmask.getInt()))
+            if (gatewayAddress != destAddress)
                 route->setGateway(gatewayAddress);
             route->setType(IPv4Route::DIRECT);
             route->setSource(IPv4Route::MANUAL);
