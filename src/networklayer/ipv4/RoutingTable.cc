@@ -50,7 +50,12 @@ FILE *routingLogFile = NULL;
 
 void ensureRoutingLogFileOpen() {
     if (routingLogFile == NULL) {
+        // Hack for create results folder
+        simulation.getSystemModule()->recordScalar("hackForCreateResultsFolder", 0);
+
         routingLogFile = fopen(ev.getConfig()->getAsFilename(CFGID_ROUTINGLOG_FILE).c_str(), "w");
+        if (!routingLogFile)
+            routingLogFile = stdout;
         ASSERT(routingLogFile);
     }
 }
