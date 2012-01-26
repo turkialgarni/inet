@@ -36,7 +36,7 @@
 #include "ICMPv6Access.h"
 #include "ICMPv6Message_m.h"
 #include "IPv6ControlInfo.h"
-#include "IPv6Datagram_m.h"
+#include "IPv6Datagram.h"
 #include "IPv6InterfaceData.h"
 #endif
 

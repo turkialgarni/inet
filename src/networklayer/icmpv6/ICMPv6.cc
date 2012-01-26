@@ -16,8 +16,15 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
-#include <omnetpp.h>
+#include "INETDefs.h"
+
 #include "ICMPv6.h"
+
+#include "ICMPv6Message_m.h"
+#include "IPv6ControlInfo.h"
+#include "IPv6Datagram.h"
+
+#include "PingPayload_m.h"
 
 
 Define_Module(ICMPv6);
@@ -42,7 +49,7 @@ void ICMPv6::handleMessage(cMessage *msg)
     // request from application
     if (msg->getArrivalGate()->isName("pingIn"))
     {
-        sendEchoRequest(PK(msg));
+        sendEchoRequest(check_and_cast<PingPayload *>(msg));
         return;
     }
 }
@@ -110,14 +117,26 @@ void ICMPv6::processEchoRequest(ICMPv6EchoRequestMsg *request)
 void ICMPv6::processEchoReply(ICMPv6EchoReplyMsg *reply)
 {
     IPv6ControlInfo *ctrl = check_and_cast<IPv6ControlInfo*>(reply->removeControlInfo());
-    cPacket *payload = reply->decapsulate();
+    PingPayload *payload = check_and_cast<PingPayload *>(reply->decapsulate());
     payload->setControlInfo(ctrl);
     delete reply;
-    send(payload, "pingOut");
+    long originatorId = payload->getOriginatorId();
+    PingMap::iterator i = pingMap.find(originatorId);
+    if (i != pingMap.end())
+        send(payload, "pingOut", i->second);
+    else
+    {
+        EV << "Received ECHO REPLY has an unknown originator ID: " << originatorId << ", packet dropped." << endl;
+        delete payload;
+    }
 }
 
-void ICMPv6::sendEchoRequest(cPacket *msg)
+void ICMPv6::sendEchoRequest(PingPayload *msg)
 {
+    cGate *arrivalGate = msg->getArrivalGate();
+    int i = arrivalGate->getIndex();
+    pingMap[msg->getOriginatorId()] = i;
+
     IPv6ControlInfo *ctrl = check_and_cast<IPv6ControlInfo*>(msg->removeControlInfo());
     ctrl->setProtocol(IP_PROT_IPv6_ICMP);
     ICMPv6EchoRequestMsg *request = new ICMPv6EchoRequestMsg(msg->getName());
