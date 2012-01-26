@@ -48,6 +48,14 @@
  * @ingroup SimSupport
  * @see Topology::Node, Topology::Link, Topology::LinkIn, Topology::LinkOut
  */
+
+//TODO doucument: graph may be modified by hand; graph nodes/links may or may not correspond to modules/gates
+//TODO add notes: manually added nodes/links may not have cModule*/cGate* pointers (getModule() etc may be NULL)
+//TODO make methods virtual, factory method for node/link creation
+//TODO inconsistency: Node takes cModule* in ctor, but Link's srcGate/destGate are set in addLink()!!!
+//TODO add link payloads
+//TODO weight: how to compute automatically from link datarate?
+
 class INET_API Topology : public cOwnedObject
 {
   public:
@@ -62,7 +70,7 @@ class INET_API Topology : public cOwnedObject
     {
         friend class Topology;
 
-      private:
+      protected:
         cObject *payload;
         int moduleId;
         double weight;
@@ -82,8 +90,14 @@ class INET_API Topology : public cOwnedObject
 
         /** @name Node attributes: weight, enabled state, correspondence to modules. */
         //@{
-
+        /**
+         * TODO document
+         */
         cObject *getPayload() const {return payload;}
+
+        /**
+         * TODO document
+         */
         void setPayload(cObject *payload) {this->payload = payload;}
 
         /**
