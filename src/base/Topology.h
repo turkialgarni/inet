@@ -323,6 +323,10 @@ class INET_API Topology : public cOwnedObject
     std::vector<Node*> nodes;
     Node *target;
 
+    // note: the purpose of the (unsigned int) cast is that nodes with moduleId==-1 are inserted at the end of the vector
+    static bool lessByModuleId(Node *a, Node *b) { return (unsigned int)a->moduleId < (unsigned int)b->moduleId; }
+    static bool isModuleIdLess(Node *a, int moduleId) { return (unsigned int)a->moduleId < (unsigned int)moduleId; }
+
   public:
     /** @name Constructors, destructor, assignment */
     //@{
@@ -456,6 +460,23 @@ class INET_API Topology : public cOwnedObject
      */
     void clear();
     //@}
+
+    /** @name Manipulating the graph.
+     */
+    //@{
+    /**
+     * Adds the given node to the graph. Returns the index of the new graph node
+     * (see getNode(int)). Indices of existing graph nodes may change.
+     */
+    int addNode(Node *node);
+
+    /**
+     * Removes the given node from the graph, together with all of its links.
+     * Indices of existing graph nodes may change.
+     */
+    void deleteNode(Node *node);
+    //@}
+
 
     /** @name Functions to examine topology by hand.
      *

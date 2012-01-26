@@ -24,6 +24,7 @@
 #include <sstream>
 #include "Topology.h"
 #include "PatternMatcher.h"
+#include "stlutils.h"
 
 using inet::PatternMatcher;
 
@@ -231,6 +232,61 @@ void Topology::extractFromNetwork(bool (*predicate)(cModule *,void *), void *dat
     }
 }
 
+int Topology::addNode(Node *node)
+{
+    if (node->moduleId == -1)
+    {
+        // elements without module ID are stored at the end
+        nodes.push_back(node);
+        return nodes.size() - 1;
+    }
+    else
+    {
+        // must find an insertion point because nodes[] is ordered by module ID
+        std::vector<Node*>::iterator it = std::lower_bound(nodes.begin(), nodes.end(), node->getModuleId(), isModuleIdLess);
+        nodes.insert(it, node);
+        return it - nodes.begin();
+    }
+}
+
+void Topology::deleteNode(Node *node)
+{
+    // remove outgoing links
+    for (int i=0; i<node->outLinks.size(); i++) {
+        Link *link = node->outLinks[i];
+
+        // remove link from dest node
+        std::vector<Link*> destInLinks = link->destNode->inLinks;
+        std::vector<Link*>::iterator it = find(destInLinks, link);
+        ASSERT(it != destInLinks.end());
+        destInLinks.erase(it);
+
+        delete link;
+    }
+    node->outLinks.clear();
+
+    // remove incoming links
+    for (int i=0; i<node->inLinks.size(); i++) {
+        Link *link = node->inLinks[i];
+
+        // remove link from src node
+        std::vector<Link*> srcOutLinks = link->srcNode->outLinks;
+        std::vector<Link*>::iterator it = find(srcOutLinks, link);
+        ASSERT(it != srcOutLinks.end());
+        srcOutLinks.erase(it);
+
+        delete link;
+    }
+    node->inLinks.clear();
+
+    // remove from nodes[]
+    std::vector<Node*>::iterator it = find(nodes, node);
+    ASSERT(it != nodes.end());
+    nodes.erase(it);
+
+    delete node;
+}
+
 Topology::Node *Topology::getNode(int i)
 {
     if (i<0 || i>=nodes.size())
@@ -240,20 +296,9 @@ Topology::Node *Topology::getNode(int i)
 
 Topology::Node *Topology::getNodeFor(cModule *mod)
 {
-    // binary search can be done because nodev[] is ordered
-
-    int lo, up, index;
-    for ( lo=0, up=nodes.size(), index=(lo+up)/2;
-          lo<index;
-          index=(lo+up)/2 )
-    {
-        // cycle invariant: nodes[lo]->moduleId <= mod->getId() < nodes[up]->moduleId
-        if (mod->getId() < nodes[index]->moduleId)
-             up = index;
-        else
-             lo = index;
-    }
-    return (mod->getId() == nodes[index]->moduleId) ? nodes[index] : NULL;
+    // binary search because nodes[] is ordered by module ID
+    std::vector<Node*>::iterator it = std::lower_bound(nodes.begin(), nodes.end(), mod->getId(), isModuleIdLess);
+    return it==nodes.end() || it->moduleId != mod->getId() ? NULL : *it;
 }
 
 void Topology::calculateUnweightedSingleShortestPathsTo(Node *_target)
