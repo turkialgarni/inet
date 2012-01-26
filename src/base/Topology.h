@@ -327,6 +327,9 @@ class INET_API Topology : public cOwnedObject
     static bool lessByModuleId(Node *a, Node *b) { return (unsigned int)a->moduleId < (unsigned int)b->moduleId; }
     static bool isModuleIdLess(Node *a, int moduleId) { return (unsigned int)a->moduleId < (unsigned int)moduleId; }
 
+    void unlinkFromSourceNode(Link *link);
+    void unlinkFromDestNode(Link *link);
+
   public:
     /** @name Constructors, destructor, assignment */
     //@{
@@ -475,6 +478,25 @@ class INET_API Topology : public cOwnedObject
      * Indices of existing graph nodes may change.
      */
     void deleteNode(Node *node);
+
+    /**
+     * TODO
+     * Note: also serves as reconnectLink()
+     */
+    void addLink(Link *link, Node *srcNode, Node *destNode);
+
+    /**
+     * TODO
+     * Note: also serves as reconnectLink()
+     */
+    void addLink(Link *link, cGate *srcGate, cGate *destGate);
+
+    /**
+     * Removes the given link from the graph. Indices of existing links in the
+     * source and destination nodes may change.
+     */
+    void deleteLink(Link *link);
+
     //@}
 
 

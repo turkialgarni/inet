@@ -254,13 +254,7 @@ void Topology::deleteNode(Node *node)
     // remove outgoing links
     for (int i=0; i<node->outLinks.size(); i++) {
         Link *link = node->outLinks[i];
-
-        // remove link from dest node
-        std::vector<Link*> destInLinks = link->destNode->inLinks;
-        std::vector<Link*>::iterator it = find(destInLinks, link);
-        ASSERT(it != destInLinks.end());
-        destInLinks.erase(it);
-
+        unlinkFromDestNode(link);
         delete link;
     }
     node->outLinks.clear();
@@ -268,13 +262,7 @@ void Topology::deleteNode(Node *node)
     // remove incoming links
     for (int i=0; i<node->inLinks.size(); i++) {
         Link *link = node->inLinks[i];
-
-        // remove link from src node
-        std::vector<Link*> srcOutLinks = link->srcNode->outLinks;
-        std::vector<Link*>::iterator it = find(srcOutLinks, link);
-        ASSERT(it != srcOutLinks.end());
-        srcOutLinks.erase(it);
-
+        unlinkFromSourceNode(link);
         delete link;
     }
     node->inLinks.clear();
@@ -287,6 +275,69 @@ void Topology::deleteNode(Node *node)
     delete node;
 }
 
+void Topology::addLink(Link *link, Node *srcNode, Node *destNode)
+{
+    // remove from graph if it's already in
+    if (link->srcNode)
+        unlinkFromSourceNode(link);
+    if (link->destNode)
+        unlinkFromDestNode(link);
+
+    // insert
+    link->srcNode = srcNode;
+    link->destNode = destNode;
+    link->srcGateId = link->destGateId = -1;
+    srcNode->outLinks.push_back(link);
+    destNode->inLinks.push_back(link);
+}
+
+void Topology::addLink(Link *link, cGate *srcGate, cGate *destGate)
+{
+    // remove from graph if it's already in
+    if (link->srcNode)
+        unlinkFromSourceNode(link);
+    if (link->destNode)
+        unlinkFromDestNode(link);
+
+    // insert
+    Node *srcNode = getNodeFor(srcGate->getOwnerModule());
+    Node *destNode = getNodeFor(destGate->getOwnerModule());
+    if (!srcNode)
+        throw cRuntimeError("cTopology::addLink: module of source gate \"%s\" is not in the graph", srcGate->getFullPath().c_str());
+    if (!destNode)
+        throw cRuntimeError("cTopology::addLink: module of destination gate \"%s\" is not in the graph", destGate->getFullPath().c_str());
+    link->srcNode = srcNode;
+    link->destNode = destNode;
+    link->srcGateId = srcGate->getId();
+    link->destGateId = destGate->getId();
+    srcNode->outLinks.push_back(link);
+    destNode->inLinks.push_back(link);
+}
+
+void Topology::deleteLink(Link *link)
+{
+    unlinkFromSourceNode(link);
+    unlinkFromDestNode(link);
+    delete link;
+}
+
+void Topology::unlinkFromSourceNode(Link *link)
+{
+    std::vector<Link*> srcOutLinks = link->srcNode->outLinks;
+    std::vector<Link*>::iterator it = find(srcOutLinks, link);
+    ASSERT(it != srcOutLinks.end());
+    srcOutLinks.erase(it);
+}
+
+void Topology::unlinkFromDestNode(Link *link)
+{
+    std::vector<Link*> destInLinks = link->destNode->inLinks;
+    std::vector<Link*>::iterator it = find(destInLinks, link);
+    ASSERT(it != destInLinks.end());
+    destInLinks.erase(it);
+}
+
+
 Topology::Node *Topology::getNode(int i)
 {
     if (i<0 || i>=nodes.size())
@@ -298,7 +349,7 @@ Topology::Node *Topology::getNodeFor(cModule *mod)
 {
     // binary search because nodes[] is ordered by module ID
     std::vector<Node*>::iterator it = std::lower_bound(nodes.begin(), nodes.end(), mod->getId(), isModuleIdLess);
-    return it==nodes.end() || it->moduleId != mod->getId() ? NULL : *it;
+    return it==nodes.end() || (*it)->moduleId != mod->getId() ? NULL : *it;
 }
 
 void Topology::calculateUnweightedSingleShortestPathsTo(Node *_target)
