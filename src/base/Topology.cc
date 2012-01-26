@@ -32,24 +32,24 @@ Register_Class(Topology);
 
 Topology::LinkIn *Topology::Node::getLinkIn(int i)
 {
-    if (i<0 || i>=num_in_links)
+    if (i<0 || i>=numInLinks)
         throw cRuntimeError("Topology::Node::getLinkIn: invalid link index %d", i);
-    return (Topology::LinkIn *)in_links[i];
+    return (Topology::LinkIn *)inLinks[i];
 }
 
 Topology::LinkOut *Topology::Node::getLinkOut(int i)
 {
-    if (i<0 || i>=num_out_links)
+    if (i<0 || i>=numOutLinks)
         throw cRuntimeError("Topology::Node::getLinkOut: invalid index %d", i);
-    return (Topology::LinkOut *)(out_links+i);
+    return (Topology::LinkOut *)(outLinks+i);
 }
 
 //----
 
 Topology::Topology(const char *name) : cOwnedObject(name)
 {
-    num_nodes = 0;
-    nodev = NULL;
+    numNodes = 0;
+    nodes = NULL;
 }
 
 Topology::Topology(const Topology& topo) : cOwnedObject(topo)
@@ -65,7 +65,7 @@ Topology::~Topology()
 std::string Topology::info() const
 {
     std::stringstream out;
-    out << "n=" << num_nodes;
+    out << "n=" << numNodes;
     return out.str();
 }
 
@@ -86,15 +86,15 @@ Topology& Topology::operator=(const Topology&)
 
 void Topology::clear()
 {
-    for (int i=0; i<num_nodes; i++)
+    for (int i=0; i<numNodes; i++)
     {
-        delete [] nodev[i].in_links;
-        delete [] nodev[i].out_links;
+        delete [] nodes[i].inLinks;
+        delete [] nodes[i].outLinks;
     }
-    delete [] nodev;
+    delete [] nodes;
 
-    num_nodes = 0;
-    nodev = NULL;
+    numNodes = 0;
+    nodes = NULL;
 }
 
 //---
@@ -189,34 +189,34 @@ void Topology::extractFromNetwork(bool (*selfunc)(cModule *,void *), void *data)
         if (mod && selfunc(mod,data))
         {
             // ith module is OK, insert into nodev[]
-            temp_nodev[k].module_id = mod_id;
-            temp_nodev[k].wgt = 0;
-            temp_nodev[k].enabl = true;
+            temp_nodev[k].moduleId = mod_id;
+            temp_nodev[k].weight = 0;
+            temp_nodev[k].enabled = true;
 
             // init auxiliary variables
             temp_nodev[k].dist = INFINITY;
-            temp_nodev[k].out_path = NULL;
+            temp_nodev[k].outPath = NULL;
 
             // create in_links[] arrays (big enough...)
-            temp_nodev[k].num_in_links = 0;
-            temp_nodev[k].in_links = new Topology::Link *[mod->gateCount()];
+            temp_nodev[k].numInLinks = 0;
+            temp_nodev[k].inLinks = new Topology::Link *[mod->gateCount()];
 
             k++;
         }
     }
-    num_nodes = k;
+    numNodes = k;
 
-    nodev = new Node[num_nodes];
-    memcpy(nodev, temp_nodev, num_nodes*sizeof(Node));
+    nodes = new Node[numNodes];
+    memcpy(nodes, temp_nodev, numNodes*sizeof(Node));
     delete [] temp_nodev;
 
     // Discover out neighbors too.
-    for (int k=0; k<num_nodes; k++)
+    for (int k=0; k<numNodes; k++)
     {
         // Loop through all its gates and find those which come
         // from or go to modules included in the topology.
 
-        cModule *mod = simulation.getModule(nodev[k].module_id);
+        cModule *mod = simulation.getModule(nodes[k].moduleId);
         Topology::Link *temp_out_links = new Topology::Link[mod->gateCount()];
 
         int n_out=0;
@@ -236,38 +236,38 @@ void Topology::extractFromNetwork(bool (*selfunc)(cModule *,void *), void *data)
             // if we arrived at a module in the topology, record it.
             if (gate)
             {
-                temp_out_links[n_out].src_node = nodev+k;
-                temp_out_links[n_out].src_gate = src_gate->getId();
-                temp_out_links[n_out].dest_node = getNodeFor(gate->getOwnerModule());
-                temp_out_links[n_out].dest_gate = gate->getId();
-                temp_out_links[n_out].wgt = 1.0;
-                temp_out_links[n_out].enabl = true;
+                temp_out_links[n_out].srcNode = nodes+k;
+                temp_out_links[n_out].srcGateId = src_gate->getId();
+                temp_out_links[n_out].destNode = getNodeFor(gate->getOwnerModule());
+                temp_out_links[n_out].destGateId = gate->getId();
+                temp_out_links[n_out].weight = 1.0;
+                temp_out_links[n_out].enabled = true;
                 n_out++;
             }
         }
-        nodev[k].num_out_links = n_out;
+        nodes[k].numOutLinks = n_out;
 
-        nodev[k].out_links = new Topology::Link[n_out];
-        memcpy(nodev[k].out_links, temp_out_links, n_out*sizeof(Topology::Link));
+        nodes[k].outLinks = new Topology::Link[n_out];
+        memcpy(nodes[k].outLinks, temp_out_links, n_out*sizeof(Topology::Link));
         delete [] temp_out_links;
     }
 
     // fill in_links[] arrays
-    for (int k=0; k<num_nodes; k++)
+    for (int k=0; k<numNodes; k++)
     {
-        for (int l=0; l<nodev[k].num_out_links; l++)
+        for (int l=0; l<nodes[k].numOutLinks; l++)
         {
-            Topology::Link *link = &nodev[k].out_links[l];
-            link->dest_node->in_links[link->dest_node->num_in_links++] = link;
+            Topology::Link *link = &nodes[k].outLinks[l];
+            link->destNode->inLinks[link->destNode->numInLinks++] = link;
         }
     }
 }
 
 Topology::Node *Topology::getNode(int i)
 {
-    if (i<0 || i>=num_nodes)
+    if (i<0 || i>=numNodes)
         throw cRuntimeError(this,"invalid node index %d",i);
-    return nodev+i;
+    return nodes+i;
 }
 
 Topology::Node *Topology::getNodeFor(cModule *mod)
@@ -275,17 +275,17 @@ Topology::Node *Topology::getNodeFor(cModule *mod)
     // binary search can be done because nodev[] is ordered
 
     int lo, up, index;
-    for ( lo=0, up=num_nodes, index=(lo+up)/2;
+    for ( lo=0, up=numNodes, index=(lo+up)/2;
           lo<index;
           index=(lo+up)/2 )
     {
         // cycle invariant: nodev[lo].mod_id <= mod->getId() < nodev[up].mod_id
-        if (mod->getId() < nodev[index].module_id)
+        if (mod->getId() < nodes[index].moduleId)
              up = index;
         else
              lo = index;
     }
-    return (mod->getId() == nodev[index].module_id) ? nodev+index : NULL;
+    return (mod->getId() == nodes[index].moduleId) ? nodes+index : NULL;
 }
 
 void Topology::calculateUnweightedSingleShortestPathsTo(Node *_target)
@@ -296,10 +296,10 @@ void Topology::calculateUnweightedSingleShortestPathsTo(Node *_target)
         throw cRuntimeError(this,"..ShortestPathTo(): target node is NULL");
     target = _target;
 
-    for (int i=0; i<num_nodes; i++)
+    for (int i=0; i<numNodes; i++)
     {
-       nodev[i].dist = INFINITY;
-       nodev[i].out_path = NULL;
+       nodes[i].dist = INFINITY;
+       nodes[i].outPath = NULL;
     }
     target->dist = 0;
 
@@ -313,17 +313,17 @@ void Topology::calculateUnweightedSingleShortestPathsTo(Node *_target)
        q.pop_front();
 
        // for each w adjacent to v...
-       for (int i=0; i<v->num_in_links; i++)
+       for (int i=0; i<v->numInLinks; i++)
        {
-           if (!(v->in_links[i]->enabl)) continue;
+           if (!(v->inLinks[i]->enabled)) continue;
 
-           Node *w = v->in_links[i]->src_node;
-           if (!w->enabl) continue;
+           Node *w = v->inLinks[i]->srcNode;
+           if (!w->enabled) continue;
 
            if (w->dist == INFINITY)
            {
                w->dist = v->dist + 1;
-               w->out_path = v->in_links[i];
+               w->outPath = v->inLinks[i];
                q.push_back(w);
            }
        }
@@ -337,10 +337,10 @@ void Topology::calculateWeightedSingleShortestPathsTo(Node *_target)
     target = _target;
 
     // clean path infos
-    for (int i=0; i<num_nodes; i++)
+    for (int i=0; i<numNodes; i++)
     {
-       nodev[i].dist = INFINITY;
-       nodev[i].out_path = NULL;
+       nodes[i].dist = INFINITY;
+       nodes[i].outPath = NULL;
     }
 
     target->dist = 0;
@@ -375,7 +375,7 @@ void Topology::calculateWeightedSingleShortestPathsTo(Node *_target)
                 if (src->dist != INFINITY)
                     q.remove(src);   // src is in the queue
                 src->dist = newdist;
-                src->out_path = dest->in_links[i];
+                src->outPath = dest->inLinks[i];
 
                 // insert src node to ordered list
                 std::list<Node*>::iterator it;
