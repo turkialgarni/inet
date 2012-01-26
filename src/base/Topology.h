@@ -66,17 +66,19 @@ class INET_API Topology : public cOwnedObject
         int moduleId;
         double weight;
         bool enabled;
-
-        int numInLinks;
-        Link **inLinks;
-        int numOutLinks;
-        Link *outLinks;
+        std::vector<Link*> inLinks;
+        std::vector<Link*> outLinks;
 
         // variables used by the shortest-path algorithms
         double dist;
         Link *outPath;
 
       public:
+        /**
+         * Constructor
+         */
+        Node(int moduleId=-1) {this->moduleId=moduleId; weight=0; enabled=true; dist=INFINITY; outPath=NULL;}
+
         /** @name Node attributes: weight, enabled state, correspondence to modules. */
         //@{
 
@@ -127,7 +129,7 @@ class INET_API Topology : public cOwnedObject
         /**
          * Returns the number of incoming links to this graph node.
          */
-        int getNumInLinks() const  {return numInLinks;}
+        int getNumInLinks() const  {return inLinks.size();}
 
         /**
          * Returns ith incoming link of graph node.
@@ -137,7 +139,7 @@ class INET_API Topology : public cOwnedObject
         /**
          * Returns the number of outgoing links from this graph node.
          */
-        int getNumOutLinks() const  {return numOutLinks;}
+        int getNumOutLinks() const  {return outLinks.size();}
 
         /**
          * Returns ith outgoing link of graph node.
@@ -185,6 +187,11 @@ class INET_API Topology : public cOwnedObject
         bool enabled;
 
       public:
+        /**
+         * Constructor.
+         */
+        Link() {srcNode=destNode=NULL; srcGateId=destGateId=-1; weight=1; enabled=true;}
+
         /**
          * Returns the weight of this link. Weight is used with the
          * weighted shortest path finder methods of Topology.
@@ -313,8 +320,7 @@ class INET_API Topology : public cOwnedObject
     };
 
   protected:
-    int numNodes;
-    Node *nodes;
+    std::vector<Node*> nodes;
     Node *target;
 
   public:
@@ -461,7 +467,7 @@ class INET_API Topology : public cOwnedObject
     /**
      * Returns the number of nodes in the graph.
      */
-    int getNumNodes() const  {return numNodes;}
+    int getNumNodes() const  {return nodes.size();}
 
     /**
      * Returns pointer to the ith node in the graph. Node's methods

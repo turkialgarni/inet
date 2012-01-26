@@ -32,24 +32,23 @@ Register_Class(Topology);
 
 Topology::LinkIn *Topology::Node::getLinkIn(int i)
 {
-    if (i<0 || i>=numInLinks)
+    if (i<0 || i>=inLinks.size())
         throw cRuntimeError("Topology::Node::getLinkIn: invalid link index %d", i);
     return (Topology::LinkIn *)inLinks[i];
 }
 
 Topology::LinkOut *Topology::Node::getLinkOut(int i)
 {
-    if (i<0 || i>=numOutLinks)
+    if (i<0 || i>=outLinks.size())
         throw cRuntimeError("Topology::Node::getLinkOut: invalid index %d", i);
-    return (Topology::LinkOut *)(outLinks+i);
+    return (Topology::LinkOut *)outLinks[i];
 }
 
 //----
 
 Topology::Topology(const char *name) : cOwnedObject(name)
 {
-    numNodes = 0;
-    nodes = NULL;
+    target = NULL;
 }
 
 Topology::Topology(const Topology& topo) : cOwnedObject(topo)
@@ -65,7 +64,7 @@ Topology::~Topology()
 std::string Topology::info() const
 {
     std::stringstream out;
-    out << "n=" << numNodes;
+    out << "n=" << nodes.size();
     return out.str();
 }
 
@@ -86,15 +85,13 @@ Topology& Topology::operator=(const Topology&)
 
 void Topology::clear()
 {
-    for (int i=0; i<numNodes; i++)
+    for (int i=0; i<nodes.size(); i++)
     {
-        delete [] nodes[i].inLinks;
-        delete [] nodes[i].outLinks;
+        for (int j=0; j<nodes[i]->outLinks.size(); j++)
+            delete nodes[i]->outLinks[j];  // delete links from their source side
+        delete nodes[i];
     }
-    delete [] nodes;
-
-    numNodes = 0;
-    nodes = NULL;
+    nodes.clear();
 }
 
 //---
@@ -174,52 +171,29 @@ void Topology::extractFromNetwork(Predicate *predicate)
     extractFromNetwork(selectByPredicate, (void *)predicate);
 }
 
-void Topology::extractFromNetwork(bool (*selfunc)(cModule *,void *), void *data)
+void Topology::extractFromNetwork(bool (*predicate)(cModule *,void *), void *data)
 {
     clear();
 
-    Node *temp_nodev = new Node[simulation.getLastModuleId()];
-
-    // Loop through all modules and find those which have the required
-    // parameter with the (optionally) required value.
-    int k=0;
-    for (int mod_id=0; mod_id<=simulation.getLastModuleId(); mod_id++)
+    // Loop through all modules and find those that satisfy the criteria
+    for (int modId=0; modId<=simulation.getLastModuleId(); modId++)
     {
-        cModule *mod = simulation.getModule(mod_id);
-        if (mod && selfunc(mod,data))
-        {
-            // ith module is OK, insert into nodev[]
-            temp_nodev[k].moduleId = mod_id;
-            temp_nodev[k].weight = 0;
-            temp_nodev[k].enabled = true;
-
-            // init auxiliary variables
-            temp_nodev[k].dist = INFINITY;
-            temp_nodev[k].outPath = NULL;
-
-            // create in_links[] arrays (big enough...)
-            temp_nodev[k].numInLinks = 0;
-            temp_nodev[k].inLinks = new Topology::Link *[mod->gateCount()];
-
-            k++;
+        cModule *mod = simulation.getModule(modId);
+        if (mod && predicate(mod,data)) {
+            Node *node = new Node(modId); //TODO factory method
+            nodes.push_back(node);
         }
     }
-    numNodes = k;
-
-    nodes = new Node[numNodes];
-    memcpy(nodes, temp_nodev, numNodes*sizeof(Node));
-    delete [] temp_nodev;
 
     // Discover out neighbors too.
-    for (int k=0; k<numNodes; k++)
+    for (int k=0; k<nodes.size(); k++)
     {
         // Loop through all its gates and find those which come
         // from or go to modules included in the topology.
 
-        cModule *mod = simulation.getModule(nodes[k].moduleId);
-        Topology::Link *temp_out_links = new Topology::Link[mod->gateCount()];
+        Node *node = nodes[k];
+        cModule *mod = simulation.getModule(node->moduleId);
 
-        int n_out=0;
         for (cModule::GateIterator i(mod); !i.end(); i++)
         {
             cGate *gate = i();
@@ -227,47 +201,41 @@ void Topology::extractFromNetwork(bool (*selfunc)(cModule *,void *), void *data)
                 continue;
 
             // follow path
-            cGate *src_gate = gate;
+            cGate *srcGate = gate;
             do {
                 gate = gate->getNextGate();
             }
-            while(gate && !selfunc(gate->getOwnerModule(),data));
+            while(gate && !predicate(gate->getOwnerModule(),data));
 
             // if we arrived at a module in the topology, record it.
             if (gate)
             {
-                temp_out_links[n_out].srcNode = nodes+k;
-                temp_out_links[n_out].srcGateId = src_gate->getId();
-                temp_out_links[n_out].destNode = getNodeFor(gate->getOwnerModule());
-                temp_out_links[n_out].destGateId = gate->getId();
-                temp_out_links[n_out].weight = 1.0;
-                temp_out_links[n_out].enabled = true;
-                n_out++;
+                Link *link = new Link(); //TODO factory method
+                link->srcNode = node;
+                link->srcGateId = srcGate->getId();
+                link->destNode = getNodeFor(gate->getOwnerModule());
+                link->destGateId = gate->getId();
+                node->outLinks.push_back(link);
             }
         }
-        nodes[k].numOutLinks = n_out;
-
-        nodes[k].outLinks = new Topology::Link[n_out];
-        memcpy(nodes[k].outLinks, temp_out_links, n_out*sizeof(Topology::Link));
-        delete [] temp_out_links;
     }
 
-    // fill in_links[] arrays
-    for (int k=0; k<numNodes; k++)
+    // fill inLinks vectors
+    for (int k=0; k<nodes.size(); k++)
     {
-        for (int l=0; l<nodes[k].numOutLinks; l++)
+        for (int l=0; l<nodes[k]->outLinks.size(); l++)
         {
-            Topology::Link *link = &nodes[k].outLinks[l];
-            link->destNode->inLinks[link->destNode->numInLinks++] = link;
+            Topology::Link *link = nodes[k]->outLinks[l];
+            link->destNode->inLinks.push_back(link);
         }
     }
 }
 
 Topology::Node *Topology::getNode(int i)
 {
-    if (i<0 || i>=numNodes)
+    if (i<0 || i>=nodes.size())
         throw cRuntimeError(this,"invalid node index %d",i);
-    return nodes+i;
+    return nodes[i];
 }
 
 Topology::Node *Topology::getNodeFor(cModule *mod)
@@ -275,17 +243,17 @@ Topology::Node *Topology::getNodeFor(cModule *mod)
     // binary search can be done because nodev[] is ordered
 
     int lo, up, index;
-    for ( lo=0, up=numNodes, index=(lo+up)/2;
+    for ( lo=0, up=nodes.size(), index=(lo+up)/2;
           lo<index;
           index=(lo+up)/2 )
     {
-        // cycle invariant: nodev[lo].mod_id <= mod->getId() < nodev[up].mod_id
-        if (mod->getId() < nodes[index].moduleId)
+        // cycle invariant: nodes[lo]->moduleId <= mod->getId() < nodes[up]->moduleId
+        if (mod->getId() < nodes[index]->moduleId)
              up = index;
         else
              lo = index;
     }
-    return (mod->getId() == nodes[index].moduleId) ? nodes+index : NULL;
+    return (mod->getId() == nodes[index]->moduleId) ? nodes[index] : NULL;
 }
 
 void Topology::calculateUnweightedSingleShortestPathsTo(Node *_target)
@@ -296,10 +264,10 @@ void Topology::calculateUnweightedSingleShortestPathsTo(Node *_target)
         throw cRuntimeError(this,"..ShortestPathTo(): target node is NULL");
     target = _target;
 
-    for (int i=0; i<numNodes; i++)
+    for (int i=0; i<nodes.size(); i++)
     {
-       nodes[i].dist = INFINITY;
-       nodes[i].outPath = NULL;
+       nodes[i]->dist = INFINITY;
+       nodes[i]->outPath = NULL;
     }
     target->dist = 0;
 
@@ -313,12 +281,14 @@ void Topology::calculateUnweightedSingleShortestPathsTo(Node *_target)
        q.pop_front();
 
        // for each w adjacent to v...
-       for (int i=0; i<v->numInLinks; i++)
+       for (int i=0; i<v->inLinks.size(); i++)
        {
-           if (!(v->inLinks[i]->enabled)) continue;
+           if (!v->inLinks[i]->enabled)
+               continue;
 
            Node *w = v->inLinks[i]->srcNode;
-           if (!w->enabled) continue;
+           if (!w->enabled)
+               continue;
 
            if (w->dist == INFINITY)
            {
@@ -337,10 +307,10 @@ void Topology::calculateWeightedSingleShortestPathsTo(Node *_target)
     target = _target;
 
     // clean path infos
-    for (int i=0; i<numNodes; i++)
+    for (int i=0; i<nodes.size(); i++)
     {
-       nodes[i].dist = INFINITY;
-       nodes[i].outPath = NULL;
+       nodes[i]->dist = INFINITY;
+       nodes[i]->outPath = NULL;
     }
 
     target->dist = 0;
@@ -359,10 +329,12 @@ void Topology::calculateWeightedSingleShortestPathsTo(Node *_target)
         // for each w adjacent to v...
         for (int i=0; i < dest->getNumInLinks(); i++)
         {
-            if (!(dest->getLinkIn(i)->isEnabled())) continue;
+            if (!(dest->getLinkIn(i)->isEnabled()))
+                continue;
 
             Node *src = dest->getLinkIn(i)->getRemoteNode();
-            if (!src->isEnabled()) continue;
+            if (!src->isEnabled())
+                continue;
 
             double linkWeight = dest->getLinkIn(i)->getWeight();
             ASSERT(linkWeight > 0.0);
