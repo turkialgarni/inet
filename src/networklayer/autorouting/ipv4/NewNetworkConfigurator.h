@@ -18,14 +18,14 @@
 #ifndef __INET_NEWNETWORKCONFIGURATOR_H
 #define __INET_NEWNETWORKCONFIGURATOR_H
 
-#include <omnetpp.h>
 #include "INETDefs.h"
 #include "IPv4Address.h"
+#include "PatternMatcher.h"
 
 class IInterfaceTable;
 class IRoutingTable;
-namespace inet { class PatternMatcher; }
 
+using inet::PatternMatcher;
 
 /**
  * Configures IPv4 addresses for a network.

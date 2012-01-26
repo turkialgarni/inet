@@ -17,13 +17,13 @@
 
 #include <set>
 #include <algorithm>
+#include "stlutils.h"
 #include "IRoutingTable.h"
 #include "IInterfaceTable.h"
 #include "IPvXAddressResolver.h"
 #include "NewNetworkConfigurator.h"
 #include "InterfaceEntry.h"
 #include "IPv4InterfaceData.h"
-#include "PatternMatcher.h"
 
 
 Define_Module(NewNetworkConfigurator);
@@ -128,15 +128,6 @@ void NewNetworkConfigurator::extractTopology(cTopology& topo, NetworkInfo& netwo
         }
     }
 }
-
-template<typename T>
-typename std::vector<T>::iterator find(std::vector<T>& v, T& a) {return std::find(v.begin(), v.end(), a);}
-
-template<typename T>
-typename std::vector<T>::const_iterator find(const std::vector<T>& v, T& a) {return std::find(v.begin(), v.end(), a);}
-
-template<typename T>
-inline bool contains(const std::vector<T>& v, T& a) {return find(v, a) != v.end();}
 
 void NewNetworkConfigurator::visitNeighbor(cTopology::LinkOut *linkOut, LinkInfo* linkInfo,
         std::set<InterfaceEntry*>& interfacesSeen, std::vector<cTopology::Node*>& deviceNodesVisited)
