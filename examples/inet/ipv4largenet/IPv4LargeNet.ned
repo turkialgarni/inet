@@ -21,7 +21,7 @@ package inet.examples.inet.ipv4largenet;
 
 import inet.linklayer.ethernet.EtherBus;
 import inet.linklayer.ethernet.EtherHub;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 import inet.nodes.ethernet.EtherSwitch;
 import inet.nodes.inet.Router;
 import inet.nodes.inet.StandardHost;
@@ -230,7 +230,7 @@ network IPv4LargeNet
         slanD[ds]: IPv4SmallLAN;
         mlanD[dm]: IPv4MediumLAN;
         llanD[dl]: IPv4LargeLAN;
-        newNetworkConfigurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             @display("p=121,37");
         }
     connections:

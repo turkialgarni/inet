@@ -20,7 +20,7 @@ package inet.examples.inet.routerperf;
 
 import inet.util.ThruputMeteringChannel;
 import inet.nodes.inet.Router;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 
 network RouterPerfNetwork
 {
@@ -32,7 +32,7 @@ network RouterPerfNetwork
             thruputDisplayFormat = "u";
         }
     submodules:
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 @display("p=61,163");
         }

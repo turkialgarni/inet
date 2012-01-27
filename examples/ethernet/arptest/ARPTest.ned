@@ -18,7 +18,7 @@ import ned.DatarateChannel;
 import inet.nodes.inet.StandardHost;
 import inet.nodes.inet.Router;
 import inet.nodes.ethernet.EtherSwitch;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 
 
 network ARPTest
@@ -56,8 +56,11 @@ network ARPTest
         server: StandardHost {
             @display("p=512,58;i=device/server_l");
         }
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             @display("p=495,160");
+            optimizeRoutes = false;
+            dumpAddresses = true;
+            dumpRoutes = true;
         }
     connections:
         client.ethg++ <--> ethline <--> switch.ethg++;

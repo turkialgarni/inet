@@ -21,7 +21,7 @@
 
 package inet.examples.inet.kidsnw1;
 
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 import inet.nodes.inet.Router;
 import inet.nodes.inet.StandardHost;
 import ned.DatarateChannel;
@@ -76,9 +76,9 @@ network KIDSNw1
             parameters:
                 @display("p=329,101,row");
         }
-        newNetworkConfigurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
-                config = xmldoc("netconf.xml");
+                config = xmldoc("netconf_err3.xml");
                 @display("p=93,22");
         }
     connections:

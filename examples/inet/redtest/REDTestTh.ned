@@ -25,7 +25,7 @@ import inet.util.ThruputMeteringChannel;
 import inet.util.ThruputMeter;
 import inet.nodes.inet.StandardHost;
 import inet.nodes.inet.Router;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 
 
 network REDTestTh
@@ -36,7 +36,7 @@ network REDTestTh
             thruputDisplayFormat = "b (u)";
         }
     submodules:
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 @display("p=149,40");
         }

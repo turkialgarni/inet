@@ -17,7 +17,7 @@ import ned.DatarateChannel;
 import inet.nodes.inet.StandardHost;
 import inet.nodes.inet.Router;
 import inet.nodes.ethernet.EtherSwitch;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 
 
 channel line1 extends DatarateChannel
@@ -59,7 +59,7 @@ network VoIPToolTrafficTest
             parameters:
                 @display("p=589,58;i=device/server_l");
         }
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 config=xml("<config><interface hosts='*' address='10.0.x.x' netmask='255.255.x.x'/></config>");
                 @display("p=44,19;i=block/cogwheel_s");

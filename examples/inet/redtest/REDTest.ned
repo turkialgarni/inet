@@ -22,7 +22,7 @@ import inet.world.scenario.ScenarioManager;
 import inet.util.ThruputMeteringChannel;
 import inet.nodes.inet.StandardHost;
 import inet.nodes.inet.Router;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 
 
 network REDTest
@@ -33,7 +33,7 @@ network REDTest
             thruputDisplayFormat = "b (u) #N";
         }
     submodules:
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 @display("p=179,40");
         }

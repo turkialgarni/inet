@@ -23,7 +23,7 @@ import ned.DatarateChannel;
 import inet.nodes.inet.StandardHost;
 import inet.nodes.ethernet.EtherSwitch;
 import inet.nodes.ethernet.EtherHost;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 import inet.linklayer.ethernet.EtherHub;
 import inet.linklayer.ethernet.EtherBus;
 
@@ -211,7 +211,7 @@ network VoIPToolLargeNet
         llanD[dl]: VoIPToolLargeLAN;
         voipClient: StandardHost;
         voipServer: StandardHost;
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 config=xml("<config><interface hosts='*' address='10.x.x.x' netmask='255.x.x.x'/></config>");
                 @display("p=495,160;i=block/cogwheel_s");

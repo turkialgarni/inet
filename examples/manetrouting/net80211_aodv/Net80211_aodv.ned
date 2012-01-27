@@ -18,7 +18,7 @@
 
 package inet.examples.manetrouting.net80211_aodv;
 
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 import inet.nodes.inet.AdhocHost;
 import inet.world.radio.ChannelControl;
 
@@ -46,7 +46,7 @@ network Net80211_aodv
             parameters:
                 @display("p=60,50;i=misc/sun");
         }
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 config=xml("<config><interface hosts='*' address='145.236.x.x' netmask='255.255.0.0'/></config>");
                 @display("p=140,50;i=block/cogwheel_s");

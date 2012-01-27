@@ -24,7 +24,7 @@ package inet.examples.sctp.nclients;
 import inet.util.ThruputMeteringChannel;
 import inet.nodes.inet.StandardHost;
 import inet.nodes.inet.Router;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 
 
 network NClients
@@ -45,7 +45,7 @@ network NClients
             thruputDisplayFormat = "u";
         }
     submodules:
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 @display("p=185,50");
         }

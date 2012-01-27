@@ -31,7 +31,7 @@
 
 package inet.examples.httptools.socket.tenserverssocket;
 
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 import inet.nodes.inet.Router;
 import inet.nodes.inet.StandardHost;
 import inet.world.httptools.HttpController;
@@ -56,7 +56,7 @@ network Http10Servers
         double numclients @prompt("Number of clients") = default(10);
         @display("bgb=939,624");
     submodules:
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 //                moduleTypes = "Router StandardHost";
                 //                nonIPModuleTypes = "";

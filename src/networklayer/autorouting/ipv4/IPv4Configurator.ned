@@ -37,7 +37,7 @@ package inet.networklayer.autorouting.ipv4;
 //          @gateway        next hop address (IPvXAddressResolver syntax)
 //          @interface      output interface name
 //          @metric         number
-simple NewNetworkConfigurator
+simple IPv4Configurator
 {
     parameters:
         @display("i=block/cogwheel_s");

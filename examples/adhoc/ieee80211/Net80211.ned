@@ -18,7 +18,7 @@
 
 package inet.examples.adhoc.ieee80211;
 
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 import inet.nodes.inet.AdhocHost;
 import inet.world.radio.ChannelControl;
 
@@ -36,7 +36,7 @@ network Net80211
             parameters:
                 @display("p=60,50");
         }
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             config=xml("<config><interface hosts='*' address='192.168.x.x' netmask='255.255.0.0'/></config>");
             @display("p=140,50");
         }

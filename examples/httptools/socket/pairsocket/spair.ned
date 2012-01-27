@@ -6,7 +6,7 @@
 
 package inet.examples.httptools.socket.pairsocket;
 
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 import inet.nodes.inet.StandardHost;
 import inet.world.httptools.HttpController;
 
@@ -23,7 +23,7 @@ network HttpSockPair
                 datarate = 1000Mbps;
         }
     submodules:
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 //                moduleTypes = "StandardHost";
                 //                nonIPModuleTypes = "";

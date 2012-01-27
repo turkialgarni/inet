@@ -23,7 +23,7 @@ package inet.examples.adhoc.mf80211;
 
 import inet.world.radio.ChannelControl;
 import inet.nodes.mf80211.MFMobileHost;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 
 
 network Net80211
@@ -39,7 +39,7 @@ network Net80211
             parameters:
                 @display("p=60,50");
         }
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             parameters:
                 config=xml("<config><interface hosts='*' address='192.168.x.x' netmask='255.255.0.0'/></config>");
                 @display("p=140,50");

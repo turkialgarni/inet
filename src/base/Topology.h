@@ -63,6 +63,7 @@ class INET_API Topology : public cOwnedObject
         friend class Topology;
 
       private:
+        cObject *payload;
         int moduleId;
         double weight;
         bool enabled;
@@ -81,6 +82,9 @@ class INET_API Topology : public cOwnedObject
 
         /** @name Node attributes: weight, enabled state, correspondence to modules. */
         //@{
+
+        cObject *getPayload() const {return payload;}
+        void setPayload(cObject *payload) {this->payload = payload;}
 
         /**
          * Returns the ID of the network module to which this node corresponds.
@@ -190,7 +194,7 @@ class INET_API Topology : public cOwnedObject
         /**
          * Constructor.
          */
-        Link() {srcNode=destNode=NULL; srcGateId=destGateId=-1; weight=1; enabled=true;}
+        Link(double weight=1) {srcNode=destNode=NULL; srcGateId=destGateId=-1; this->weight=weight; enabled=true;}
 
         /**
          * Returns the weight of this link. Weight is used with the
@@ -237,12 +241,13 @@ class INET_API Topology : public cOwnedObject
       public:
         /**
          * Returns the node at the remote end of this connection.
-         *
-         * Note: There is no corresponding localNode() method: the local node of
-         * this connection is the Node object whose method returned
-         * this LinkIn object.
          */
         Node *getRemoteNode() const  {return srcNode;}
+
+        /**
+         * Returns the node at the local end of this connection.
+         */
+        Node *getLocalNode() const  {return destNode;}
 
         /**
          * Returns the gate ID at the remote end of this connection.
@@ -279,12 +284,13 @@ class INET_API Topology : public cOwnedObject
       public:
         /**
          * Returns the node at the remote end of this connection.
-         *
-         * Note: There is no corresponding localNode() method: the local node of
-         * this connection is the Node object whose method returned
-         * this LinkIn object.
          */
         Node *getRemoteNode() const  {return destNode;}
+
+        /**
+         * Returns the node at the local end of this connection.
+         */
+        Node *getLocalNode() const  {return srcNode;}
 
         /**
          * Returns the gate ID at the remote end of this connection.

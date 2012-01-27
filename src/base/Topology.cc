@@ -244,7 +244,7 @@ int Topology::addNode(Node *node)
     {
         // must find an insertion point because nodes[] is ordered by module ID
         std::vector<Node*>::iterator it = std::lower_bound(nodes.begin(), nodes.end(), node->getModuleId(), isModuleIdLess);
-        nodes.insert(it, node);
+        it = nodes.insert(it, node);
         return it - nodes.begin();
     }
 }
@@ -284,9 +284,12 @@ void Topology::addLink(Link *link, Node *srcNode, Node *destNode)
         unlinkFromDestNode(link);
 
     // insert
+    if (link->srcNode != srcNode)
+        link->srcGateId = -1;
+    if (link->destNode != destNode)
+        link->destGateId = -1;
     link->srcNode = srcNode;
     link->destNode = destNode;
-    link->srcGateId = link->destGateId = -1;
     srcNode->outLinks.push_back(link);
     destNode->inLinks.push_back(link);
 }
@@ -323,7 +326,7 @@ void Topology::deleteLink(Link *link)
 
 void Topology::unlinkFromSourceNode(Link *link)
 {
-    std::vector<Link*> srcOutLinks = link->srcNode->outLinks;
+    std::vector<Link*>& srcOutLinks = link->srcNode->outLinks;
     std::vector<Link*>::iterator it = find(srcOutLinks, link);
     ASSERT(it != srcOutLinks.end());
     srcOutLinks.erase(it);
@@ -331,7 +334,7 @@ void Topology::unlinkFromSourceNode(Link *link)
 
 void Topology::unlinkFromDestNode(Link *link)
 {
-    std::vector<Link*> destInLinks = link->destNode->inLinks;
+    std::vector<Link*>& destInLinks = link->destNode->inLinks;
     std::vector<Link*>::iterator it = find(destInLinks, link);
     ASSERT(it != destInLinks.end());
     destInLinks.erase(it);

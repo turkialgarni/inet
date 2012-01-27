@@ -5,7 +5,7 @@ package inet.examples.rtp.multicast11;
 import ned.DatarateChannel;
 import inet.transport.rtp.RTPHost;
 import inet.nodes.inet.Router;
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 
 
 network RTPMulticast11
@@ -60,7 +60,7 @@ network RTPMulticast11
                 pppg[];
 
         }
-        configurator: NewNetworkConfigurator {
+        configurator: IPv4Configurator {
             @display("p=58,32");
         }
     connections:

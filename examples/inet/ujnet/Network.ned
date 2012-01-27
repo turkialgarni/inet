@@ -4,15 +4,14 @@
 
 package inet.examples.inet.ujnet;
 
-import inet.networklayer.autorouting.ipv4.NewNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 import inet.nodes.ethernet.EtherSwitch;
 import inet.nodes.inet.Router;
 import inet.nodes.inet.StandardHost;
 
-
-module Subnet
+module LAN
 {
-    @display("bgl=10;bgb=555,307;i=misc/cloud;is=vl");
+    @display("bgl=12;bgb=395,342;i=misc/cloud;is=vl");
     gates:
         inout ethg[];
     types:
@@ -22,123 +21,125 @@ module Subnet
         }
     submodules:
         switch: EtherSwitch {
-            @display("p=335,160");
-        }
-        lonelyHost: StandardHost {
-            @display("p=77,58");
+            @display("p=206,163");
         }
         host1: StandardHost {
-            @display("p=206,110");
+            @display("p=302,84;t=10.x.x.1");
         }
         host2: StandardHost {
-            @display("p=477,133");
+            @display("p=263,271;t=10.x.x.2");
         }
         host3: StandardHost {
-            @display("p=213,239");
+            @display("p=84,164;t=10.x.x.3");
         }
     connections:
-        lonelyHost.ethg++ <--> Link <--> ethg++;
-        lonelyHost.ethg++ <--> Link <--> host1.ethg++;
         host1.ethg++ <--> Link <--> switch.ethg++;
         host2.ethg++ <--> Link <--> switch.ethg++;
         host3.ethg++ <--> Link <--> switch.ethg++;
-        for i=1..sizeof(ethg) - 1 {
-            switch.ethg++ <--> Link <--> ethg++;
+        for i=0..sizeof(ethg) - 1 {
+            switch.ethg++ <--> ethg++;
         }
 }
 
-//
-// Generated network with random topology (10 nodes, 20 edges, seed=100).
-//
-network Network
+module Area
 {
-    parameters:
-        @display("bgb=700,485;bgl=22");
+    @display("bgl=12;bgb=506,453;i=misc/cloud;is=vl");
+    gates:
+        inout ethg[];
     types:
         channel Link extends ned.DatarateChannel
         {
             datarate = 1Gbps;
         }
     submodules:
-        configurator: NewNetworkConfigurator {
-            @display("p=473,44");
-            config = xml("\
-            <root> \
-                <interface hosts='r0' towards='r1' address='99.100.x.x' netmask='255.255.x.x'/> \
-                <interface hosts='r8 r9' names='*' address='11.3.x.x' netmask='255.255.x.x'/> \
-            </root> \
-            ");
+        lan1: LAN {
+            @display("p=391,86;t=10.x.1.x");
         }
-        r0: Router {
-            @display("p=335,251");
+        lan2: LAN {
+            @display("p=391,355;t=10.x.2.x");
         }
-        r1: Router {
-            @display("p=391,318");
+        lan3: LAN {
+            @display("p=106,355;t=10.x.3.x");
         }
-        r2: Router {
-            @display("p=402,212");
+        lan4: LAN {
+            @display("p=106,86;t=10.x.4.x");
         }
-        r3: Router {
-            @display("p=352,386");
+        router1: Router {
+            @display("p=250,87");
         }
-        r4: Router {
-            @display("p=462,254");
+        router2: Router {
+            @display("p=391,219");
         }
-        r5: Router {
-            @display("p=272,431");
+        router3: Router {
+            @display("p=250,356");
         }
-        r6: Router {
-            @display("p=233,282");
-        }
-        r7: Router {
-            @display("p=462,364");
-        }
-        r8: Router {
-            @display("p=509,194");
-        }
-        r9: Router {
-            @display("p=423,431");
-        }
-        subnet: Subnet {
-            @display("p=283,183");
-        }
-        subnet1: Subnet {
-            @display("p=585,264");
-        }
-        subnet2: Subnet {
-            @display("p=550,408");
-        }
-        subnet3: Subnet {
-            @display("p=108,263");
-        }
-        switch: EtherSwitch {
-            @display("p=638,348");
+        router4: Router {
+            @display("p=106,219");
         }
     connections:
-        r0.pppg++ <--> Link <--> r1.pppg++;
-        r0.pppg++ <--> Link <--> r2.pppg++;
-        r0.pppg++ <--> Link <--> r3.pppg++;
-        r0.pppg++ <--> Link <--> r4.pppg++;
-        r0.pppg++ <--> Link <--> r5.pppg++;
-        r0.pppg++ <--> Link <--> r6.pppg++;
-        r1.pppg++ <--> Link <--> r2.pppg++;
-        r1.pppg++ <--> Link <--> r3.pppg++;
-        r2.pppg++ <--> Link <--> r7.pppg++;
-        r2.pppg++ <--> Link <--> r8.pppg++;
-        r3.pppg++ <--> Link <--> r5.pppg++;
-        r3.pppg++ <--> Link <--> r7.pppg++;
-        r4.pppg++ <--> Link <--> r7.pppg++;
-        r4.pppg++ <--> Link <--> r8.pppg++;
-        r5.pppg++ <--> Link <--> r6.pppg++;
-        r5.pppg++ <--> Link <--> r9.pppg++;
-        r7.pppg++ <--> Link <--> r9.pppg++;
-        r1.pppg++ <--> Link <--> r7.pppg++;
-        subnet1.ethg++ <--> r8.ethg++;
-        subnet1.ethg++ <--> r4.ethg++;
-        subnet.ethg++ <--> r2.ethg++;
-        subnet.ethg++ <--> r6.ethg++;
-        subnet3.ethg++ <--> r6.ethg++;
-        subnet2.ethg++ <--> r9.ethg++;
-        subnet1.ethg++ <--> switch.ethg++;
-        switch.ethg++ <--> subnet2.ethg++;
+        lan1.ethg++ <--> Link <--> router1.ethg++;
+        lan2.ethg++ <--> Link <--> router2.ethg++;
+        lan3.ethg++ <--> Link <--> router3.ethg++;
+        lan4.ethg++ <--> Link <--> router4.ethg++;
+        router1.ethg++ <--> Link <--> router2.ethg++;
+        router2.ethg++ <--> Link <--> router3.ethg++;
+        router3.ethg++ <--> Link <--> router4.ethg++;
+        router4.ethg++ <--> Link <--> router1.ethg++;
+        router1.ethg++ <--> ethg++;
+}
+
+network Network
+{
+    parameters:
+        @display("bgb=708,518;bgl=22");
+    types:
+        channel Link extends ned.DatarateChannel
+        {
+            datarate = 10Gbps;
+        }
+    submodules:
+        configurator: IPv4Configurator {
+            @display("p=37,31");
+            optimizeRoutes = true;
+            dumpAddresses = true;
+            dumpRoutes = true;
+            config = xmldoc("network.xml");
+        }
+        area11: Area {
+            @display("p=261,80;t=10.11.x.x");
+        }
+        area12: Area {
+            @display("p=426,80;t=10.12.x.x");
+        }
+        area21: Area {
+            @display("p=581,299;t=10.21.x.x");
+        }
+        area22: Area {
+            @display("p=426,432;t=10.22.x.x");
+        }
+        area31: Area {
+            @display("p=104,299;t=10.31.x.x");
+        }
+        area32: Area {
+            @display("p=261,432;t=10.32.x.x");
+        }
+        router1: Router {
+            @display("p=337,196");
+        }
+        router2: Router {
+            @display("p=426,300");
+        }
+        router3: Router {
+            @display("p=261,300");
+        }
+    connections:
+        router1.ethg++ <--> Link <--> router2.ethg++;
+        router2.ethg++ <--> Link <--> router3.ethg++;
+        router3.ethg++ <--> Link <--> router1.ethg++;
+        router1.ethg++ <--> Link <--> area11.ethg++;
+        router1.ethg++ <--> Link <--> area12.ethg++;
+        router2.ethg++ <--> Link <--> area21.ethg++;
+        router2.ethg++ <--> Link <--> area22.ethg++;
+        router3.ethg++ <--> Link <--> area31.ethg++;
+        router3.ethg++ <--> Link <--> area32.ethg++;
 }
