@@ -243,7 +243,7 @@ int Topology::addNode(Node *node)
     else
     {
         // must find an insertion point because nodes[] is ordered by module ID
-        std::vector<Node*>::iterator it = std::lower_bound(nodes.begin(), nodes.end(), node->getModuleId(), isModuleIdLess);
+        std::vector<Node*>::iterator it = std::lower_bound(nodes.begin(), nodes.end(), node, lessByModuleId);
         it = nodes.insert(it, node);
         return it - nodes.begin();
     }
@@ -351,7 +351,9 @@ Topology::Node *Topology::getNode(int i)
 Topology::Node *Topology::getNodeFor(cModule *mod)
 {
     // binary search because nodes[] is ordered by module ID
-    std::vector<Node*>::iterator it = std::lower_bound(nodes.begin(), nodes.end(), mod->getId(), isModuleIdLess);
+    Node tmpNode(mod->getId());
+    std::vector<Node*>::iterator it = std::lower_bound(nodes.begin(), nodes.end(), &tmpNode, lessByModuleId);
+//TODO: this does not compile with VC9 (VC10 is OK): std::vector<Node*>::iterator it = std::lower_bound(nodes.begin(), nodes.end(), mod->getId(), isModuleIdLess);
     return it==nodes.end() || (*it)->moduleId != mod->getId() ? NULL : *it;
 }
 
