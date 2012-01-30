@@ -238,7 +238,7 @@ int IPv4Address::getNumMatchingPrefixBits(const IPv4Address& to_cmp) const
 
 int IPv4Address::getNetmaskLength() const
 {
-    for (int i=0; i<31; i++)
+    for (int i=0; i<32; i++)
         if (addr & (1 << i))
             return 32-i;
     return 0;

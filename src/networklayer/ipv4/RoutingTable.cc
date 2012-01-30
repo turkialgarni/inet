@@ -532,10 +532,6 @@ void RoutingTable::setRouterId(IPv4Address a)
 
 void RoutingTable::internalAddRoute(IPv4Route *entry)
 {
-    // check for null address and default route
-    if (entry->getDestination().isUnspecified() != entry->getNetmask().isUnspecified())
-        error("addRoute(): to add a default route, set both destination and netmask to zero");
-
     if (!entry->getNetmask().isValidNetmask())
         error("addRoute(): wrong netmask %s in route", entry->getNetmask().str().c_str());
 
