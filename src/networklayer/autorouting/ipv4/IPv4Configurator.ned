@@ -42,6 +42,7 @@ simple IPv4Configurator
     parameters:
         @display("i=block/cogwheel_s");
         xml config = default(xml("<empty/>"));
+        bool configureDisjunctSubnets = default(true);
         bool addStaticRoutes = default(true);
         bool optimizeRoutes = default(true);
         bool dumpAddresses = default(false);

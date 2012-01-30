@@ -116,7 +116,7 @@ class INET_API IPv4Configurator : public cSimpleModule
     // helper functions
     virtual void parseAddressAndSpecifiedBits(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits);
     virtual bool linkContainsMatchingHostExcept(LinkInfo *linkInfo, Matcher *hostMatcher, cModule *exceptModule);
-    virtual void visitNeighbor(Topology& topology, Topology::LinkOut *linkOut, LinkInfo* linkInfo, std::set<InterfaceEntry*>& interfacesSeen, std::vector<Topology::Node*>& nodesVisited);
+    virtual void visitNeighbor(Topology::LinkOut *linkOut, LinkInfo* linkInfo, std::set<InterfaceEntry*>& interfacesSeen, std::vector<Topology::Node*>& nodesVisited);
     const char *getMandatoryAttribute(cXMLElement *element, const char *attr);
     virtual void resolveInterfaceAndGateway(NodeInfo *node, const char *interfaceAttr, const char *gatewayAttr,
             InterfaceEntry *&outIE, IPv4Address& outGateway, const NetworkInfo& networkInfo);
