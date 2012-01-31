@@ -35,9 +35,6 @@
 
 Define_Module(RoutingTable);
 
-Register_PerRunConfigOption(CFGID_ROUTINGLOG_FILE, "routinglog-file", CFG_FILENAME, "${resultdir}/${configname}-${runnumber}.rt", "Name of the routing log file to generate.");
-
-#define LL INT64_PRINTF_FORMAT  // for eventnumber_t
 
 std::ostream& operator<<(std::ostream& os, const IPv4Route& e)
 {
@@ -45,20 +42,6 @@ std::ostream& operator<<(std::ostream& os, const IPv4Route& e)
     return os;
 };
 
-
-FILE *routingLogFile = NULL;
-
-void ensureRoutingLogFileOpen() {
-    if (routingLogFile == NULL) {
-        // Hack for create results folder
-        simulation.getSystemModule()->recordScalar("hackForCreateResultsFolder", 0);
-
-        routingLogFile = fopen(ev.getConfig()->getAsFilename(CFGID_ROUTINGLOG_FILE).c_str(), "w");
-        if (!routingLogFile)
-            routingLogFile = stdout;
-        ASSERT(routingLogFile);
-    }
-}
 
 RoutingTable::RoutingTable()
 {
@@ -528,15 +511,6 @@ bool RoutingTable::routeLessThan(const IPv4Route *a, const IPv4Route *b)
 void RoutingTable::setRouterId(IPv4Address a)
 {
     routerId = a;
-
-    // time, moduleId, routerID
-    ensureRoutingLogFileOpen();
-    fprintf(routingLogFile, "ID  %s  %d  %s\n",
-            SIMTIME_STR(simTime()),
-            getParentModule()->getId(), //XXX we assume routing table is direct child of the node compound module
-            a.str().c_str()
-            );
-    fflush(routingLogFile);
 }
 
 void RoutingTable::internalAddRoute(IPv4Route *entry)
@@ -588,19 +562,6 @@ void RoutingTable::addRoute(IPv4Route *entry)
     invalidateCache();
     updateDisplayString();
 
-    // time, moduleId, routerID, dest, dest netmask, nexthop
-    ensureRoutingLogFileOpen();
-    fprintf(routingLogFile, "+R  %"LL"d  %s  %d  %s  %s  %s  %s\n",
-            simulation.getEventNumber(),
-            SIMTIME_STR(simTime()),
-            getParentModule()->getId(),
-            getRouterId().str().c_str(),
-            entry->getDestination().str().c_str(),
-            entry->getNetmask().str().c_str(),
-            entry->getGateway().str().c_str()
-            );
-    fflush(routingLogFile);
-
     nb->fireChangeNotification(NF_IPv4_ROUTE_ADDED, entry);
 }
 
@@ -609,19 +570,6 @@ IPv4Route *RoutingTable::internalRemoveRoute(IPv4Route *entry)
     RouteVector::iterator i = std::find(routes.begin(), routes.end(), entry);
     if (i!=routes.end())
     {
-        // time, routerID, dest, dest netmask, nexthop  (same as addRoute())
-        ensureRoutingLogFileOpen();
-        fprintf(routingLogFile, "-R  %"LL"d  %s  %d  %s  %s  %s  %s\n",
-                simulation.getEventNumber(),
-                SIMTIME_STR(simTime()),
-                getParentModule()->getId(),
-                getRouterId().str().c_str(),
-                entry->getDestination().str().c_str(),
-                entry->getNetmask().str().c_str(),
-                entry->getGateway().str().c_str()
-                );
-        fflush(routingLogFile);
-
         routes.erase(i);
         entry->setRoutingTable(NULL);
         return entry;
