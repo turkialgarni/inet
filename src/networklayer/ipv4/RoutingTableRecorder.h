@@ -40,8 +40,11 @@ class INET_API RoutingTableRecorder : public cSimpleModule, protected INotifiabl
     virtual int numInitStages() const  {return 1;}
     virtual void initialize(int stage);
     virtual void handleMessage(cMessage *);
+    virtual void hookListeners();
     virtual void receiveChangeNotification(int category, const cObject *details);
     virtual void ensureRoutingLogFileOpen();
+    virtual void recordInterfaceChange(int category, const InterfaceEntry *ie);
+    virtual void recordRouteChange(int category, const IPv4Route *route);
 };
 
 #endif

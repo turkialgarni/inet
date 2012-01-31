@@ -16,10 +16,14 @@
 //
 
 
-#include "IPv4Route.h"
 #include "NotifierConsts.h"
 #include "NotificationBoard.h"
+#include "IRoutingTable.h"
+#include "IPv4Route.h"
+#include "IInterfaceTable.h"
+#include "IPv4InterfaceData.h"
 #include "RoutingTableRecorder.h"
+
 
 Define_Module(RoutingTableRecorder);
 
@@ -39,22 +43,35 @@ RoutingTableRecorder::~RoutingTableRecorder()
 
 void RoutingTableRecorder::initialize(int stage)
 {
+    if (par("enabled").boolValue())
+        hookListeners();
+}
+
+void RoutingTableRecorder::handleMessage(cMessage *)
+{
+    throw cRuntimeError(this, "This module doesn't process messages");
+}
+
+void RoutingTableRecorder::hookListeners()
+{
     // hook existing notification boards (we won't cover dynamically created hosts/routers, but oh well)
     for (int id = 0; id < simulation.getLastModuleId(); id++)
     {
         NotificationBoard *nb = dynamic_cast<NotificationBoard *>(simulation.getModule(id));
         if (nb)
         {
+            nb->subscribe(this, NF_INTERFACE_CREATED);
+            nb->subscribe(this, NF_INTERFACE_DELETED);
+            nb->subscribe(this, NF_INTERFACE_CONFIG_CHANGED);
+            nb->subscribe(this, NF_INTERFACE_IPv4CONFIG_CHANGED);
+            //nb->subscribe(this, NF_INTERFACE_IPv6CONFIG_CHANGED);
+            //nb->subscribe(this, NF_INTERFACE_STATE_CHANGED);
+
             nb->subscribe(this, NF_IPv4_ROUTE_ADDED);
-            nb->subscribe(this, NF_IPv4_ROUTE_CHANGED);
             nb->subscribe(this, NF_IPv4_ROUTE_DELETED);
+            nb->subscribe(this, NF_IPv4_ROUTE_CHANGED);
         }
     }
-}
-
-void RoutingTableRecorder::handleMessage(cMessage *)
-{
-    throw cRuntimeError(this, "This module doesn't process messages");
 }
 
 void RoutingTableRecorder::ensureRoutingLogFileOpen()
@@ -73,35 +90,67 @@ void RoutingTableRecorder::ensureRoutingLogFileOpen()
 
 void RoutingTableRecorder::receiveChangeNotification(int category, const cObject *details)
 {
-    const IPv4Route *route = dynamic_cast<const IPv4Route *>(details);
-    if (route)
-    {
-        IRoutingTable *rt = route->getRoutingTable();
-        cModule *host = rt->getHostModule();
-
-        const char *tag;
-        switch (category) {
-        case NF_IPv4_ROUTE_ADDED: tag = "+R"; break;
-        case NF_IPv4_ROUTE_CHANGED: tag = "*R"; break;
-        case NF_IPv4_ROUTE_DELETED: tag = "-R"; break;
-        default: throw cRuntimeError("Unexpected notification category %d", category);
-        }
-
-        // time, moduleId, routerID, dest, dest netmask, nexthop
-        ensureRoutingLogFileOpen();
-        fprintf(routingLogFile, "%s %"LL"d  %s  %d  %s  %s  %s  %s\n",
-                tag,
-                simulation.getEventNumber(),
-                SIMTIME_STR(simTime()),
-                host->getId(),
-                rt->getRouterId().str().c_str(),
-                route->getDestination().str().c_str(),
-                route->getNetmask().str().c_str(),
-                route->getGateway().str().c_str()
-        );
-        fflush(routingLogFile);
-    }
+    if (category==NF_IPv4_ROUTE_ADDED || category==NF_IPv4_ROUTE_DELETED || category==NF_IPv4_ROUTE_CHANGED)
+        recordRouteChange(category, check_and_cast<const IPv4Route *>(details));
+    else
+        recordInterfaceChange(category, check_and_cast<const InterfaceEntry *>(details));
 }
+
+void RoutingTableRecorder::recordInterfaceChange(int category, const InterfaceEntry *entry)
+{
+    IInterfaceTable *ift = entry->getInterfaceTable();
+    cModule *host = ift->getHostModule();
+
+    const char *tag;
+    switch (category) {
+    case NF_INTERFACE_CREATED: tag = "+I"; break;
+    case NF_INTERFACE_DELETED: tag = "-I"; break;
+    case NF_INTERFACE_CONFIG_CHANGED: tag = "*I"; break;
+    case NF_INTERFACE_IPv4CONFIG_CHANGED: tag = "*I"; break;
+    default: throw cRuntimeError("Unexpected notification category %d", category);
+    }
+
+    // time, moduleId, ifname, address
+    ensureRoutingLogFileOpen();
+    fprintf(routingLogFile, "%s  %"LL"d  %s  %d  %s %s\n",
+            tag,
+            simulation.getEventNumber(),
+            SIMTIME_STR(simTime()),
+            host->getId(),
+            entry->getName(),
+            (entry->ipv4Data()!=NULL ? entry->ipv4Data()->getIPAddress().str().c_str() : "")
+            );
+    fflush(routingLogFile);
+}
+
+void RoutingTableRecorder::recordRouteChange(int category, const IPv4Route *route)
+{
+    IRoutingTable *rt = route->getRoutingTable();
+    cModule *host = rt->getHostModule();
+
+    const char *tag;
+    switch (category) {
+    case NF_IPv4_ROUTE_ADDED: tag = "+R"; break;
+    case NF_IPv4_ROUTE_CHANGED: tag = "*R"; break;
+    case NF_IPv4_ROUTE_DELETED: tag = "-R"; break;
+    default: throw cRuntimeError("Unexpected notification category %d", category);
+    }
+
+    // time, moduleId, routerID, dest, dest netmask, nexthop
+    ensureRoutingLogFileOpen();
+    fprintf(routingLogFile, "%s %"LL"d  %s  %d  %s  %s  %s  %s\n",
+            tag,
+            simulation.getEventNumber(),
+            SIMTIME_STR(simTime()),
+            host->getId(),
+            rt->getRouterId().str().c_str(),
+            route->getDestination().str().c_str(),
+            route->getNetmask().str().c_str(),
+            route->getGateway().str().c_str()
+    );
+    fflush(routingLogFile);
+}
+
 
 //TODO: routerID change
 //    // time, moduleId, routerID
