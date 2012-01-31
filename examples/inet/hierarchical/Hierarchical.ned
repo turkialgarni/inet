@@ -2,7 +2,7 @@
 // This program is property of its copyright holder. All rights reserved.
 // 
 
-package inet.examples.inet.ujnet;
+package inet.examples.inet.hierarchical;
 
 import inet.networklayer.autorouting.ipv4.IPv4Configurator;
 import inet.nodes.ethernet.Eth100G;
@@ -13,7 +13,7 @@ import inet.nodes.inet.Router;
 import inet.nodes.inet.StandardHost;
 
 
-network Fatwork
+network Hierarchical
 {
     parameters:
         int columns = default(3);
@@ -66,10 +66,10 @@ network Fatwork
         configurator: IPv4Configurator {
             @display("p=37,31");
             optimizeRoutes = false;
-            addStaticRoutes = false;
+            dumpTopology = true;
             dumpAddresses = true;
             dumpRoutes = true;
-            config = xmldoc("network.xml");
+            config = xmldoc("hierarchical.xml");
         }
         router[columns*rows]: Router {
             @display("p=115,103,matrix,$columns;is=s");
