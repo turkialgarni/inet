@@ -32,6 +32,18 @@ Define_Module(RoutingTableRecorder);
 Register_PerRunConfigOption(CFGID_ROUTINGLOG_FILE, "routinglog-file", CFG_FILENAME, "${resultdir}/${configname}-${runnumber}.rt", "Name of the routing log file to generate.");
 
 
+// We need this because we want to know which NotificationBoard the notification comes from
+// (INotifiable::receiveChangeNotification() doesn't have NotificationBoard* as arg).
+class RoutingTableRecorderListener : public INotifiable
+{
+private:
+    NotificationBoard *nb;
+    RoutingTableRecorder *recorder;
+public:
+    RoutingTableRecorderListener(RoutingTableRecorder *recorder, NotificationBoard *nb) {this->recorder = recorder; this->nb = nb;}
+    virtual void receiveChangeNotification(int category, const cObject *details) {recorder->receiveChangeNotification(nb, category, details);}
+};
+
 RoutingTableRecorder::RoutingTableRecorder()
 {
     routingLogFile = NULL;
@@ -60,16 +72,17 @@ void RoutingTableRecorder::hookListeners()
         NotificationBoard *nb = dynamic_cast<NotificationBoard *>(simulation.getModule(id));
         if (nb)
         {
-            nb->subscribe(this, NF_INTERFACE_CREATED);
-            nb->subscribe(this, NF_INTERFACE_DELETED);
-            nb->subscribe(this, NF_INTERFACE_CONFIG_CHANGED);
-            nb->subscribe(this, NF_INTERFACE_IPv4CONFIG_CHANGED);
-            //nb->subscribe(this, NF_INTERFACE_IPv6CONFIG_CHANGED);
-            //nb->subscribe(this, NF_INTERFACE_STATE_CHANGED);
+            INotifiable *listener = new RoutingTableRecorderListener(this, nb);
+            nb->subscribe(listener, NF_INTERFACE_CREATED);
+            nb->subscribe(listener, NF_INTERFACE_DELETED);
+            nb->subscribe(listener, NF_INTERFACE_CONFIG_CHANGED);
+            nb->subscribe(listener, NF_INTERFACE_IPv4CONFIG_CHANGED);
+            //nb->subscribe(listener, NF_INTERFACE_IPv6CONFIG_CHANGED);
+            //nb->subscribe(listener, NF_INTERFACE_STATE_CHANGED);
 
-            nb->subscribe(this, NF_IPv4_ROUTE_ADDED);
-            nb->subscribe(this, NF_IPv4_ROUTE_DELETED);
-            nb->subscribe(this, NF_IPv4_ROUTE_CHANGED);
+            nb->subscribe(listener, NF_IPv4_ROUTE_ADDED);
+            nb->subscribe(listener, NF_IPv4_ROUTE_DELETED);
+            nb->subscribe(listener, NF_IPv4_ROUTE_CHANGED);
         }
     }
 }
@@ -88,18 +101,18 @@ void RoutingTableRecorder::ensureRoutingLogFileOpen()
     }
 }
 
-void RoutingTableRecorder::receiveChangeNotification(int category, const cObject *details)
+void RoutingTableRecorder::receiveChangeNotification(NotificationBoard *nb, int category, const cObject *details)
 {
+    cModule *host = nb->getParentModule();
     if (category==NF_IPv4_ROUTE_ADDED || category==NF_IPv4_ROUTE_DELETED || category==NF_IPv4_ROUTE_CHANGED)
-        recordRouteChange(category, check_and_cast<const IPv4Route *>(details));
+        recordRouteChange(host, check_and_cast<const IPv4Route *>(details), category);
     else
-        recordInterfaceChange(category, check_and_cast<const InterfaceEntry *>(details));
+        recordInterfaceChange(host, check_and_cast<const InterfaceEntry *>(details), category);
 }
 
-void RoutingTableRecorder::recordInterfaceChange(int category, const InterfaceEntry *entry)
+void RoutingTableRecorder::recordInterfaceChange(cModule *host, const InterfaceEntry *ie, int category)
 {
-    IInterfaceTable *ift = entry->getInterfaceTable();
-    cModule *host = ift->getHostModule();
+    // Note: ie->getInterfaceTable() may be NULL (entry already removed from its table)
 
     const char *tag;
     switch (category) {
@@ -117,16 +130,15 @@ void RoutingTableRecorder::recordInterfaceChange(int category, const InterfaceEn
             simulation.getEventNumber(),
             SIMTIME_STR(simTime()),
             host->getId(),
-            entry->getName(),
-            (entry->ipv4Data()!=NULL ? entry->ipv4Data()->getIPAddress().str().c_str() : "")
+            ie->getName(),
+            (ie->ipv4Data()!=NULL ? ie->ipv4Data()->getIPAddress().str().c_str() : "")
             );
     fflush(routingLogFile);
 }
 
-void RoutingTableRecorder::recordRouteChange(int category, const IPv4Route *route)
+void RoutingTableRecorder::recordRouteChange(cModule *host, const IPv4Route *route, int category)
 {
-    IRoutingTable *rt = route->getRoutingTable();
-    cModule *host = rt->getHostModule();
+    IRoutingTable *rt = route->getRoutingTable(); // may be NULL! (route already removed from its routing table)
 
     const char *tag;
     switch (category) {
@@ -143,7 +155,7 @@ void RoutingTableRecorder::recordRouteChange(int category, const IPv4Route *rout
             simulation.getEventNumber(),
             SIMTIME_STR(simTime()),
             host->getId(),
-            rt->getRouterId().str().c_str(),
+            (rt ? rt->getRouterId().str().c_str() : "*"),
             route->getDestination().str().c_str(),
             route->getNetmask().str().c_str(),
             route->getGateway().str().c_str()

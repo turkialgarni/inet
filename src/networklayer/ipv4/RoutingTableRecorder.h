@@ -27,24 +27,23 @@
   *
  * @see RoutingTable, IPv4Route
  */
-class INET_API RoutingTableRecorder : public cSimpleModule, protected INotifiable
+class INET_API RoutingTableRecorder : public cSimpleModule
 {
+    friend class RoutingTableRecorderListener;
   private:
     FILE *routingLogFile;
-
   public:
     RoutingTableRecorder();
     virtual ~RoutingTableRecorder();
-
   protected:
     virtual int numInitStages() const  {return 1;}
     virtual void initialize(int stage);
     virtual void handleMessage(cMessage *);
     virtual void hookListeners();
-    virtual void receiveChangeNotification(int category, const cObject *details);
     virtual void ensureRoutingLogFileOpen();
-    virtual void recordInterfaceChange(int category, const InterfaceEntry *ie);
-    virtual void recordRouteChange(int category, const IPv4Route *route);
+    virtual void receiveChangeNotification(NotificationBoard *nb, int category, const cObject *details);
+    virtual void recordInterfaceChange(cModule *host, const InterfaceEntry *ie, int category);
+    virtual void recordRouteChange(cModule *host, const IPv4Route *route, int category);
 };
 
 #endif
