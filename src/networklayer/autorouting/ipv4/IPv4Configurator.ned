@@ -44,7 +44,9 @@ simple IPv4Configurator
         xml config = default(xml("<empty/>"));
         bool configureDisjunctSubnets = default(true);
         bool addStaticRoutes = default(true);
+        bool addDefaultRoutes = default(true);
         bool optimizeRoutes = default(true);
+        bool dumpTopology = default(false);
         bool dumpAddresses = default(false);
         bool dumpRoutes = default(false);
 }

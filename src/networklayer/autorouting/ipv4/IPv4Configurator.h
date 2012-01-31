@@ -35,7 +35,7 @@ namespace inet { class PatternMatcher; }
  */
 class INET_API IPv4Configurator : public cSimpleModule
 {
-  protected:
+  public:
     class NodeInfo;
 
     class InterfaceInfo : public cObject {
