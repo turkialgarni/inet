@@ -65,7 +65,7 @@ network Hierarchical
     submodules:
         configurator: IPv4Configurator {
             @display("p=37,31");
-            optimizeRoutes = false;
+            optimizeRoutes = true;
             dumpTopology = true;
             dumpAddresses = true;
             dumpRoutes = true;
