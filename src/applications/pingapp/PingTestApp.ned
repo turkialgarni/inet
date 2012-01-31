@@ -55,7 +55,7 @@ simple PingTestApp like IPingApp
         double count = default(1); // count of pings in burst, step to next destination address after count ping requests, 0 is invalid
         double startTime @unit("s") = default(uniform(0s,this.sleepDuration)); // send first ping at startTime
         double stopTime @unit("s") = default(0s); // time to finish sending, 0 means forever
-        double sleepDuration @unit(s); // time between bursts
+        double sleepDuration @unit(s) = default(0s); // time between bursts
         bool printPing = default(false); // log to stdout
         @display("i=block/app");
         @signal[rtt](type=simtime_t);
