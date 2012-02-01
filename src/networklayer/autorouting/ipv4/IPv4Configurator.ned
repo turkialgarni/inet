@@ -28,6 +28,7 @@ package inet.networklayer.autorouting.ipv4;
 //          @configure      "true" (default) or "false"
 //          @address        "10.0.x.x"
 //          @netmask        "255.255.x.x"
+//          @multicastgroups   "224.0.0.1 224.0.1.33"
 //       route
 //          @host           "host* router[0..3]"
 //          @destination    destination address  (IPvXAddressResolver syntax)
