@@ -304,6 +304,7 @@ void IPv4Configurator::readAddressConfiguration(cXMLElement *root, Topology& top
         const char *addressAttr = interfaceElement->getAttribute("address"); // "10.0.x.x"
         const char *netmaskAttr = interfaceElement->getAttribute("netmask"); // "255.255.x.x"
         const char *multicastGroupsAttr = interfaceElement->getAttribute("multicastgroups"); // "224.0.0.1 224.0.1.33"
+        const char *mtuAttr = interfaceElement->getAttribute("mtu"); // integer
 
         try
         {
@@ -362,6 +363,11 @@ void IPv4Configurator::readAddressConfiguration(cXMLElement *root, Topology& top
                             // multicast addresses (note: even if configure==false! multicast addresses are treated differently)
                             for (int k = 0; k < multicastGroups.size(); k++)
                                 interfaceInfo->interfaceEntry->ipv4Data()->joinMulticastGroup(multicastGroups[k]);
+
+                            // mtu
+                            if (isNotEmpty(mtuAttr))
+                                interfaceInfo->interfaceEntry->setMtu(atoi(mtuAttr));
+
                             interfacesSeen.insert(interfaceInfo);
                             EV_DEBUG << hostModule->getFullPath() << ":" << interfaceInfo->interfaceEntry->getFullName() << endl;
                         }
