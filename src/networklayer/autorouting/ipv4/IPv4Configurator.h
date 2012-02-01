@@ -67,7 +67,7 @@ class INET_API IPv4Configurator : public cSimpleModule
             cModule *module;
             IInterfaceTable *interfaceTable;
             IRoutingTable *routingTable;
-            NodeInfo(cModule *module) {this->module = module; isIPNode = false; interfaceTable = NULL; routingTable = NULL;}
+            NodeInfo(cModule *module) { this->module = module; isIPNode = false; interfaceTable = NULL; routingTable = NULL; }
 
             virtual std::string getFullPath() const { return module->getFullPath(); }
     };
@@ -84,6 +84,32 @@ class INET_API IPv4Configurator : public cSimpleModule
             ~NetworkInfo() { for (int i = 0; i < links.size(); i++) delete links[i]; }
     };
 
+    class RouteInfo {
+        public:
+            int color;
+            bool enabled;
+            uint32 destination;
+            uint32 netmask;
+            RouteInfo(int color, uint32 destination, uint32 netmask) { this->color = color; this->enabled = true; this->destination = destination; this->netmask = netmask; }
+    };
+
+    class RoutingTableInfo {
+        public:
+            std::vector<RouteInfo *> routeInfos;
+            RoutingTableInfo(std::vector<RouteInfo *> *routeInfos) { for (int i = 0; i < routeInfos->size(); i++) this->routeInfos.push_back(new RouteInfo(*routeInfos->at(i))); }
+            void addRouteInfo(RouteInfo *routeInfo) { routeInfos.insert(upper_bound(routeInfos.begin(), routeInfos.end(), routeInfo, routeInfoLessThan), routeInfo); }
+            void removeRouteInfo(const RouteInfo *routeInfo) { routeInfos.erase(std::find(routeInfos.begin(), routeInfos.end(), routeInfo)); }
+            RouteInfo *findBestMatchingRouteInfo(const uint32 destination) const {
+                for (std::vector<RouteInfo *>::const_iterator it = routeInfos.begin(); it != routeInfos.end(); ++it) {
+                    RouteInfo *routeInfo = *it;
+                    if (routeInfo->enabled && !((destination ^ routeInfo->destination) & routeInfo->netmask))
+                        return const_cast<RouteInfo *>(routeInfo);
+                }
+                return NULL;
+            }
+            static bool routeInfoLessThan(const RouteInfo *a, const RouteInfo *b) { return a->netmask != b->netmask ? a->netmask > b->netmask : a->destination < b->destination; }
+    };
+
     class Matcher
     {
         private:
@@ -93,11 +119,11 @@ class INET_API IPv4Configurator : public cSimpleModule
             Matcher(const char *pattern);
             ~Matcher();
             bool matches(const char *s);
-            bool matchesAny() {return matchesany;}
+            bool matchesAny() { return matchesany; }
     };
 
   protected:
-    virtual int numInitStages() const  {return 3;}
+    virtual int numInitStages() const  { return 3; }
     virtual void initialize(int stage);
     virtual void handleMessage(cMessage *msg);
 
@@ -107,8 +133,7 @@ class INET_API IPv4Configurator : public cSimpleModule
     virtual void assignAddresses(Topology& topology, NetworkInfo& networkInfo);
     virtual void addManualRoutes(cXMLElement *root, Topology& topology, NetworkInfo& networkInfo);
     virtual void addStaticRoutes(Topology& topology, NetworkInfo& networkInfo);
-    virtual void optimizeRoutingTables(Topology& topology, NetworkInfo& networkInfo);
-    virtual void optimizeRoutingTable(IRoutingTable *routingTable);
+    virtual void optimizeRoutes(std::vector<IPv4Route *> *routes);
     virtual void dumpTopology(Topology& topology);
     virtual void dumpAddresses(NetworkInfo& networkInfo);
     virtual void dumpRoutes(Topology& topology);

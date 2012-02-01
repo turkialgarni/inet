@@ -85,12 +85,6 @@ void IPv4Configurator::initialize(int stage)
             addStaticRoutes(topology, networkInfo);
             printTimeSpentUsingBegin("addStaticRoutes", begin);
         }
-        else if (par("optimizeRoutes").boolValue()) {
-            // routing tables are already optimized in add static routes if requested
-            begin = clock();
-            optimizeRoutingTables(topology, networkInfo);
-            printTimeSpentUsingBegin("optimizeRoutingTables", begin);
-        }
 
         // dump the result if requested
         if (par("dumpTopology").boolValue()) {
@@ -908,7 +902,7 @@ static InterfaceEntry *findNextHopInterface(Topology::Node *sourceNode, Topology
 
 void IPv4Configurator::addStaticRoutes(Topology& topology, NetworkInfo& networkInfo)
 {
-    long optimizeRoutingTablesDuration = 0;
+    long optimizeRoutesDuration = 0;
     long addDefaultRoutesDuration = 0;
     long calculateShortestPathsDuration = 0;
 
@@ -1002,6 +996,7 @@ void IPv4Configurator::addStaticRoutes(Topology& topology, NetworkInfo& networkI
         }
 
         buildRoutingTable:
+        std::vector<IPv4Route *> sourceRoutes;
         // add a route to all destinations in the network
         for (int j = 0; j < topology.getNumNodes(); j++) {
             if (i == j)
@@ -1039,7 +1034,7 @@ void IPv4Configurator::addStaticRoutes(Topology& topology, NetworkInfo& networkI
                         route->setGateway(gatewayAddress);
                     route->setType(IPv4Route::DIRECT);
                     route->setSource(IPv4Route::MANUAL);
-                    sourceRoutingTable->addRoute(route);
+                    sourceRoutes.push_back(route);
                     EV_DEBUG << "Adding route " << sourceInterfaceEntry->getFullPath() << " -> " << destinationInterfaceEntry->getFullPath() << " as " << route->info() << endl;
                 }
             }
@@ -1048,138 +1043,125 @@ void IPv4Configurator::addStaticRoutes(Topology& topology, NetworkInfo& networkI
         // optimize routing table to save memory and increase lookup performance
         if (par("optimizeRoutes").boolValue()) {
             long begin = clock();
-            optimizeRoutingTable(sourceRoutingTable);
-            optimizeRoutingTablesDuration += clock() - begin;
+            optimizeRoutes(&sourceRoutes);
+            optimizeRoutesDuration += clock() - begin;
         }
+
+        // copy into routing table
+        for (int i = 0; i < sourceRoutes.size(); i++)
+            sourceRoutingTable->addRoute(sourceRoutes[i]);
     }
 
     // printe some timing information
     printTimeSpentUsingDuration("calculateShortestPaths", calculateShortestPathsDuration);
     printTimeSpentUsingDuration("addDefaultRoutes", addDefaultRoutesDuration);
-    printTimeSpentUsingDuration("optimizeRoutingTables", optimizeRoutingTablesDuration);
+    printTimeSpentUsingDuration("optimizeRoutes", optimizeRoutesDuration);
 }
 
-// returns true if the two routes are the same
-static bool routesHaveSameTarget(IPv4Route *route1, IPv4Route *route2)
+// returns true if the two routes are the same except their address prefix and netmask
+static bool routesHaveSameColor(IPv4Route *route1, IPv4Route *route2)
 {
     return route1->getType() == route2->getType() && route1->getSource() == route2->getSource() && route1->getMetric() == route2->getMetric() &&
            route1->getGateway() == route2->getGateway() && route1->getInterface() == route2->getInterface();
 }
 
 // returns true if the order of the routes in the routing table does not change their meaning
-static bool routesCanBeSwapped(IPv4Route *route1, IPv4Route *route2)
+static bool routesCanBeSwapped(IPv4Configurator::RouteInfo *routeInfo1, IPv4Configurator::RouteInfo *routeInfo2)
 {
-    if (routesHaveSameTarget(route1, route2))
+    if (routeInfo1->color == routeInfo2->color)
         return true;
     else {
-        uint32 destination1 = route1->getDestination().getInt();
-        uint32 netmask1 = route1->getNetmask().getInt();
-        uint32 destination2 = route2->getDestination().getInt();
-        uint32 netmask2 = route2->getNetmask().getInt();
-        uint32 netmask = std::min(netmask1, netmask2);
-        return (destination1 & netmask) != (destination2 & netmask);
+        uint32 netmask = routeInfo1->netmask & routeInfo2->netmask;
+        return (routeInfo1->destination & netmask) != (routeInfo2->destination & netmask);
     }
 }
 
 // returns true if the routes can be neighbors by repeatedly swapping routes in the routing table without changing their meaning
-static bool routesCanBeNeighbors(IRoutingTable *routingTable, int i, int j)
+static bool routesCanBeNeighbors(std::vector<IPv4Configurator::RouteInfo *> *routeInfos, int i, int j)
 {
     int begin = std::min(i, j);
     int end = std::max(i, j);
+    IPv4Configurator::RouteInfo *beginRouteInfo = routeInfos->at(begin);
     for (int index = begin + 1; index < end; index++)
-        if (!routesCanBeSwapped(routingTable->getRoute(begin), routingTable->getRoute(index)))
+        if (!routesCanBeSwapped(beginRouteInfo, routeInfos->at(index)))
             return false;
     return true;
 }
 
-static bool containsRoutes(IRoutingTable *routingTable, std::vector<IPv4Route *>& routes)
+static bool containsRoutes(IPv4Configurator::RoutingTableInfo *routingTableInfo, std::vector<IPv4Configurator::RouteInfo *> *routeInfos)
 {
-    for (int i = 0; i < routes.size(); i++) {
-        IPv4Route *route = routes[i];
-        ASSERT(route->getNetmask().getNetmaskLength() == 32);
-        IPv4Route *matchingRoute = routingTable->findBestMatchingRoute(route->getDestination());
-        if (!matchingRoute || !routesHaveSameTarget(route, matchingRoute))
+    for (int i = 0; i < routeInfos->size(); i++) {
+        IPv4Configurator::RouteInfo *routeInfo = routeInfos->at(i);
+        ASSERT(routeInfo->netmask == 0xFFFFFFFF);
+        IPv4Configurator::RouteInfo *matchingRouteInfo = routingTableInfo->findBestMatchingRouteInfo(routeInfo->destination);
+        if (!matchingRouteInfo || routeInfo->color != matchingRouteInfo->color)
             return false;
     }
     return true;
 }
 
-void IPv4Configurator::optimizeRoutingTables(Topology& topology, NetworkInfo& networkInfo)
+void IPv4Configurator::optimizeRoutes(std::vector<IPv4Route *> *originalRoutes)
 {
-    for (int nodeIndex = 0; nodeIndex < topology.getNumNodes(); nodeIndex++) {
-        Topology::Node *node = topology.getNode(nodeIndex);
-        NodeInfo *nodeInfo = (NodeInfo *)node->getPayload();
-        if (nodeInfo->isIPNode)
-            optimizeRoutingTable(nodeInfo->routingTable);
+    std::vector<IPv4Route *> colorToRouteColor;
+    std::vector<RouteInfo *> originalRouteInfos;
+    // copy original routes into originalRouteInfos
+    for (int i = 0; i < originalRoutes->size(); i++) {
+        IPv4Route *originalRoute = originalRoutes->at(i);
+        RouteInfo *originalRouteInfo = new RouteInfo(colorToRouteColor.size(), originalRoute->getDestination().getInt(), originalRoute->getNetmask().getInt());
+        originalRouteInfos.push_back(originalRouteInfo);
+        // set color
+        for (int j = 0; j < colorToRouteColor.size(); j++) {
+            if (routesHaveSameColor(colorToRouteColor[j], originalRoute)) {
+                originalRouteInfo->color = j;
+                goto next;
+            }
+        }
+        colorToRouteColor.push_back(originalRoute);
+        next:;
     }
-}
-
-void IPv4Configurator::optimizeRoutingTable(IRoutingTable *routingTable)
-{
-    std::vector<IPv4Route *> routes;
-    for (int i = 0; i < routingTable->getNumRoutes(); i++) {
-        IPv4Route *route = routingTable->getRoute(i);
-        IPv4Route *copy = new IPv4Route();
-        copy->setDestination(route->getDestination());
-        copy->setNetmask(route->getNetmask());
-        copy->setGateway(route->getGateway());
-        copy->setInterface(route->getInterface());
-        copy->setMetric(route->getMetric());
-        copy->setSource(route->getSource());
-        copy->setType(route->getType());
-        routes.push_back(copy);
-    }
+    RoutingTableInfo routingTableInfo(&originalRouteInfos);
     restart:
     // check if any two routes can be aggressively merged without changing the meaning of all original routes
     // the merged route will have the longest shared address prefix and netmask with the two merged routes
     // this optimization might change the meaning of the routing table in that it will route packets that it did not route before
-    for (int i = 0; i < routingTable->getNumRoutes(); i++) {
-        IPv4Route *routeI = routingTable->getRoute(i);
+    for (int i = 0; i < routingTableInfo.routeInfos.size(); i++) {
+        RouteInfo *routeInfoI = routingTableInfo.routeInfos.at(i);
         // iterate backward so that we try to merge longer netmasks first
+        // this results in smaller changes and allows more symmetric optimization
         for (int j = i - 1; j >= 0; j--) {
-            IPv4Route *routeJ = routingTable->getRoute(j);
-            if (routesHaveSameTarget(routeI, routeJ) && routesCanBeNeighbors(routingTable, i, j)) {
+            RouteInfo *routeInfoJ = routingTableInfo.routeInfos.at(j);
+            // merge only neighbor routes having the same color
+            if (routeInfoI->color == routeInfoJ->color && routesCanBeNeighbors(&routingTableInfo.routeInfos, i, j)) {
                 // determine longest shared address prefix and netmask by iterating through bits from left to right
                 uint32 netmask = 0;
                 uint32 destination = 0;
                 for (int bitIndex = 31; bitIndex >= 0; bitIndex--) {
                     uint32 mask = 1 << bitIndex;
-                    if ((routeI->getDestination().getInt() & mask) == (routeJ->getDestination().getInt() & mask) &&
-                        (routeI->getNetmask().getInt() & mask) != 0 && (routeJ->getNetmask().getInt() & mask) != 0)
+                    if ((routeInfoI->destination & mask) == (routeInfoJ->destination & mask) &&
+                        (routeInfoI->netmask & mask) != 0 && (routeInfoJ->netmask & mask) != 0)
                     {
                         netmask |= mask;
-                        destination |= routeI->getDestination().getInt() & mask;
+                        destination |= routeInfoI->destination & mask;
                     }
                     else
                         break;
                 }
                 // create the merged route
-                IPv4Route *mergedRoute = new IPv4Route();
-                mergedRoute->setDestination(destination);
-                mergedRoute->setNetmask(netmask);
-                mergedRoute->setInterface(routeI->getInterface());
-                mergedRoute->setGateway(routeI->getGateway());
-                mergedRoute->setType(routeI->getType());
-                mergedRoute->setSource(routeI->getSource());
-                int index = routingTable->getRouteIndex(mergedRoute);
-                // check if the original routes and the merged one could be neighbors in the routing table
-                if (!routesCanBeNeighbors(routingTable, i, index) || !routesCanBeNeighbors(routingTable, j, index)) {
-                    delete mergedRoute;
-                    goto nextPair;
-                }
-                // replace the two routes with the merged route
-                routingTable->addRoute(mergedRoute);
-                routingTable->removeRoute(routeI);
-                routingTable->removeRoute(routeJ);
-                if (containsRoutes(routingTable, routes)) {
-                    delete routeI;
-                    delete routeJ;
+                RouteInfo *mergedRouteInfo = new RouteInfo(routeInfoI->color, destination, netmask);
+                routeInfoI->enabled = false;
+                routeInfoJ->enabled = false;
+                routingTableInfo.addRouteInfo(mergedRouteInfo);
+                if (containsRoutes(&routingTableInfo, &originalRouteInfos)) {
+                    routingTableInfo.removeRouteInfo(routeInfoI);
+                    routingTableInfo.removeRouteInfo(routeInfoJ);
+                    delete routeInfoI;
+                    delete routeInfoJ;
                 }
                 else {
-                    routingTable->addRoute(routeI);
-                    routingTable->addRoute(routeJ);
-                    routingTable->removeRoute(mergedRoute);
-                    delete mergedRoute;
+                    routeInfoI->enabled = true;
+                    routeInfoJ->enabled = true;
+                    routingTableInfo.removeRouteInfo(mergedRouteInfo);
+                    delete mergedRouteInfo;
                     goto nextPair;
                 }
                 goto restart;
@@ -1187,6 +1169,24 @@ void IPv4Configurator::optimizeRoutingTable(IRoutingTable *routingTable)
             nextPair:;
         }
     }
-    for (int i = 0; i < routes.size(); i++)
-        delete routes[i];
+    // convert route infos to new routes based on color
+    std::vector<IPv4Route *> optimizedRoutes;
+    for (int i = 0; i < routingTableInfo.routeInfos.size(); i++) {
+        RouteInfo *routeInfo = routingTableInfo.routeInfos.at(i);
+        IPv4Route *routeColor = colorToRouteColor[routeInfo->color];
+        IPv4Route *optimizedRoute = new IPv4Route();
+        optimizedRoute->setDestination(routeInfo->destination);
+        optimizedRoute->setNetmask(routeInfo->netmask);
+        optimizedRoute->setInterface(routeColor->getInterface());
+        optimizedRoute->setGateway(routeColor->getGateway());
+        optimizedRoute->setType(routeColor->getType());
+        optimizedRoute->setSource(routeColor->getSource());
+        optimizedRoutes.push_back(optimizedRoute);
+        delete routeInfo;
+    }
+    // delete original routes
+    for (int i = 0; i < originalRoutes->size(); i++)
+        delete originalRoutes->at(i);
+    // copy optimized routes to original routes and return
+    *originalRoutes = optimizedRoutes;
 }
