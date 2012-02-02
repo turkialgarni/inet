@@ -15,10 +15,8 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
-
 package inet.networklayer.autorouting.ipv4;
 
-//
 // TODO
 //
 // xml:
@@ -31,8 +29,8 @@ package inet.networklayer.autorouting.ipv4;
 //          @address        "10.0.x.x"
 //          @netmask        "255.255.x.x"
 //       route
-//          @at             "host* router[0..3]"
-//          @host           destination address  (IPvXAddressResolver syntax)
+//          @host           "host* router[0..3]"
+//          @destination    destination address  (IPvXAddressResolver syntax)
 //          @netmask        default: 255.255.255.255; alternative notation: "/23"
 //          @gateway        next hop address (IPvXAddressResolver syntax)
 //          @interface      output interface name
@@ -42,12 +40,13 @@ simple IPv4Configurator
     parameters:
         @display("i=block/cogwheel_s");
         xml config = default(xml("<empty/>"));
-        bool disjunctSubnetAddresses = default(true);
-        bool addStaticRoutes = default(true);
-        bool addDefaultRoutes = default(true);
-        bool optimizeRoutes = default(true);
-        bool dumpTopology = default(false);
-        bool dumpAddresses = default(false);
-        bool dumpRoutes = default(false);
+        bool disjunctSubnetAddresses = default(true); // avoids using the same address prefix and netmask on different links when assigning IP addresses to interfaces
+        bool addStaticRoutes = default(true);  // adds static routes to the routing tables of all nodes to route to all destinations (only where applicable)
+        bool addDefaultRoutes = default(true); // adds default routes if all routes from a source node go through the same gateway
+        bool addSubnetRoutes = default(true);  // adds subnet routes instead of destination interface routes (only where applicable)
+        bool optimizeRoutes = default(true); // optimizes routing tables
+        bool dumpTopology = default(false);  // prints network topology
+        bool dumpAddresses = default(false); // prints addresses for all interfaces
+        bool dumpRoutes = default(false);    // prints routing tables for all nodes
+        string dumpConfig = default("");     // writes configuration into a config file that can be fed back to speed up subsequent runs
 }
-

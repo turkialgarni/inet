@@ -67,6 +67,12 @@ std::string IPv4Route::detailedInfo() const
     return std::string();
 }
 
+bool IPv4Route::equals(const IPv4Route& route) const
+{
+    return rt == route.rt && dest == route.dest && netmask == route.netmask && gateway == route.gateway &&
+           interfacePtr == route.interfacePtr && type == route.type && source == route.source && metric == route.metric;
+}
+
 const char *IPv4Route::getInterfaceName() const
 {
     return interfacePtr ? interfacePtr->getName() : "";

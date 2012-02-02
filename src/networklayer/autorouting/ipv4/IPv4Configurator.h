@@ -38,17 +38,22 @@ class INET_API IPv4Configurator : public cSimpleModule
   public:
     class NodeInfo;
 
+    class LinkInfo;
+
     class InterfaceInfo : public cObject {
         public:
-            bool configure;  //TODO code should obey it!
             NodeInfo *nodeInfo;
+            LinkInfo *linkInfo;
             InterfaceEntry *interfaceEntry;
+            bool configure;  //TODO code should obey it!
             IPv4Address address;
             uint32 addressSpecifiedBits;
             IPv4Address netmask;
             uint32 netmaskSpecifiedBits;
-            InterfaceInfo(NodeInfo *nodeInfo, InterfaceEntry *interfaceEntry) {
+
+            InterfaceInfo(NodeInfo *nodeInfo, LinkInfo *linkInfo, InterfaceEntry *interfaceEntry) {
                 this->nodeInfo = nodeInfo;
+                this->linkInfo = linkInfo;
                 this->interfaceEntry = interfaceEntry;
                 configure = true;
                 // NOTE: default IP addresses are in the subnet 10.x.x.x/255.255.x.x
@@ -57,7 +62,6 @@ class INET_API IPv4Configurator : public cSimpleModule
                 netmask = IPv4Address(0xFFFF0000);
                 netmaskSpecifiedBits = 0xFFFF0000;
             }
-
             virtual std::string getFullPath() const { return interfaceEntry->getFullPath(); }
     };
 
@@ -67,21 +71,26 @@ class INET_API IPv4Configurator : public cSimpleModule
             cModule *module;
             IInterfaceTable *interfaceTable;
             IRoutingTable *routingTable;
-            NodeInfo(cModule *module) { this->module = module; isIPNode = false; interfaceTable = NULL; routingTable = NULL; }
+            std::vector<InterfaceInfo*> interfaceInfos;
 
+            NodeInfo(cModule *module) { this->module = module; isIPNode = false; interfaceTable = NULL; routingTable = NULL; }
             virtual std::string getFullPath() const { return module->getFullPath(); }
     };
 
     class LinkInfo : public cObject {
         public:
-            std::vector<InterfaceInfo*> interfaces; // interfaces on that LAN or point-to-point link
-            ~LinkInfo() { for (int i = 0; i < interfaces.size(); i++) delete interfaces[i]; }
+            std::vector<InterfaceInfo*> interfaceInfos; // interfaces on that LAN or point-to-point link
+            InterfaceInfo* gatewayInterfaceInfo; // non NULL if all hosts have 1 non-loopback interface except one host that has two of them
+
+            LinkInfo() { gatewayInterfaceInfo = NULL; }
+            ~LinkInfo() { for (int i = 0; i < interfaceInfos.size(); i++) delete interfaceInfos[i]; }
     };
 
     class NetworkInfo : public cObject {  //TODO put Topology* into it
         public:
-            std::vector<LinkInfo*> links;
-            ~NetworkInfo() { for (int i = 0; i < links.size(); i++) delete links[i]; }
+            std::vector<LinkInfo*> linkInfos;
+
+            ~NetworkInfo() { for (int i = 0; i < linkInfos.size(); i++) delete linkInfos[i]; }
     };
 
     class RouteInfo {
@@ -90,18 +99,26 @@ class INET_API IPv4Configurator : public cSimpleModule
             bool enabled;
             uint32 destination;
             uint32 netmask;
+            std::vector<RouteInfo *> originalRouteInfos; // routes that are routed by this one from the unoptimized routing table
+
             RouteInfo(int color, uint32 destination, uint32 netmask) { this->color = color; this->enabled = true; this->destination = destination; this->netmask = netmask; }
     };
 
     class RoutingTableInfo {
         public:
             std::vector<RouteInfo *> routeInfos;
-            RoutingTableInfo(std::vector<RouteInfo *> *routeInfos) { for (int i = 0; i < routeInfos->size(); i++) this->routeInfos.push_back(new RouteInfo(*routeInfos->at(i))); }
-            void addRouteInfo(RouteInfo *routeInfo) { routeInfos.insert(upper_bound(routeInfos.begin(), routeInfos.end(), routeInfo, routeInfoLessThan), routeInfo); }
+
+            int addRouteInfo(RouteInfo *routeInfo) {
+                std::vector<RouteInfo *>::iterator it = upper_bound(routeInfos.begin(), routeInfos.end(), routeInfo, routeInfoLessThan);
+                int index = it - routeInfos.begin();
+                routeInfos.insert(it, routeInfo);
+                return index;
+            }
             void removeRouteInfo(const RouteInfo *routeInfo) { routeInfos.erase(std::find(routeInfos.begin(), routeInfos.end(), routeInfo)); }
-            RouteInfo *findBestMatchingRouteInfo(const uint32 destination) const {
-                for (std::vector<RouteInfo *>::const_iterator it = routeInfos.begin(); it != routeInfos.end(); ++it) {
-                    RouteInfo *routeInfo = *it;
+            RouteInfo *findBestMatchingRouteInfo(const uint32 destination) const { return findBestMatchingRouteInfo(destination, 0, routeInfos.size()); }
+            RouteInfo *findBestMatchingRouteInfo(const uint32 destination, int begin, int end) const {
+                for (int index = begin; index < end; index++) {
+                    RouteInfo *routeInfo = routeInfos.at(index);
                     if (routeInfo->enabled && !((destination ^ routeInfo->destination) & routeInfo->netmask))
                         return const_cast<RouteInfo *>(routeInfo);
                 }
@@ -137,6 +154,7 @@ class INET_API IPv4Configurator : public cSimpleModule
     virtual void dumpTopology(Topology& topology);
     virtual void dumpAddresses(NetworkInfo& networkInfo);
     virtual void dumpRoutes(Topology& topology);
+    virtual void dumpConfig(Topology& topology, NetworkInfo& networkInfo);
 
     // helper functions
     virtual void parseAddressAndSpecifiedBits(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits);
@@ -148,8 +166,7 @@ class INET_API IPv4Configurator : public cSimpleModule
     InterfaceInfo *findInterfaceOnLinkByNode(LinkInfo *linkInfo, cModule *node);
     InterfaceInfo *findInterfaceOnLinkByNodeAddress(LinkInfo *linkInfo, IPv4Address address);
     LinkInfo *findLinkOfInterface(const NetworkInfo& networkInfo, InterfaceEntry *interfaceEntry);
-    InterfaceInfo *createInterfaceInfo(NodeInfo *nodeInfo, InterfaceEntry *interfaceEntry);
+    InterfaceInfo *createInterfaceInfo(NodeInfo *nodeInfo, LinkInfo *linkInfo, InterfaceEntry *interfaceEntry);
 };
 
 #endif
-
