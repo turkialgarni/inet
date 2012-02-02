@@ -90,10 +90,6 @@ network Hierarchical99
     submodules:
         configurator: IPv4Configurator {
             @display("p=37,31");
-            optimizeRoutes = true;
-            dumpTopology = false;
-            dumpAddresses = false;
-            dumpRoutes = true;
             config = xmldoc("hierarchical99.xml");
         }
         area11: Area {

@@ -58,9 +58,6 @@ network ARPTest
         }
         configurator: IPv4Configurator {
             @display("p=495,160");
-            optimizeRoutes = false;
-            dumpAddresses = true;
-            dumpRoutes = true;
         }
     connections:
         client.ethg++ <--> ethline <--> switch.ethg++;

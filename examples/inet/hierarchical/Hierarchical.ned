@@ -65,10 +65,6 @@ network Hierarchical
     submodules:
         configurator: IPv4Configurator {
             @display("p=37,31");
-            optimizeRoutes = true;
-            dumpTopology = true;
-            dumpAddresses = true;
-            dumpRoutes = true;
             config = xmldoc("hierarchical.xml");
         }
         router[columns*rows]: Router {
