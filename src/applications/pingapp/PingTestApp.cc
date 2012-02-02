@@ -50,7 +50,7 @@ namespace {
     {
         outvector.clear();
 
-        for(int i=0; i<simulation.getLastModuleId(); i++)
+        for(int i=0; i<=simulation.getLastModuleId(); i++)
         {
             IInterfaceTable *ift = dynamic_cast<IInterfaceTable *>(simulation.getModule(i));
             if (ift)
@@ -127,7 +127,7 @@ void PingTestApp::initialize(int stage)
     WATCH(numPongs);
 
     const char *destAddrs = par("destAddresses");
-    if (!strcmp(destAddrs, "<ALL_ADDRESS>"))
+    if (!strcmp(destAddrs, "<ALL_ADDRESS>"))  //FIXME what???????????????????
     {
         getAllAddressesTo(destAddresses);
     }
