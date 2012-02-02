@@ -736,8 +736,10 @@ void IPv4Configurator::assignAddresses(Topology& topology, NetworkInfo& networkI
                 assignedInterfaceAddresses.push_back(completeAddress);
                 // configure interface with the selected address and netmask
                 IPv4InterfaceData *interfaceData = compatibleInterface->interfaceEntry->ipv4Data();
-                interfaceData->setIPAddress(completeAddress);
-                interfaceData->setNetmask(completeNetmask);
+                if (compatibleInterface->configure) {
+                    interfaceData->setIPAddress(completeAddress);
+                    interfaceData->setNetmask(completeNetmask);
+                }
                 compatibleInterface->address = completeAddress;
                 EV_DEBUG << "Selected interface address: " << completeAddress << endl;
                 // remove configured interface
@@ -1244,18 +1246,21 @@ void IPv4Configurator::optimizeRoutes(std::vector<IPv4Route *> *originalRoutes)
                     !interruptsAnyOriginalRoute(&routingTableInfo, i + 1, m, &routeInfoI->originalRouteInfos) && // check that original routes on I are not interrupted between I and M
                     !interruptsFollowingOriginalRoutes(&routingTableInfo, m)) // check that the original routes after M are not interrupted by M
                 {
+                    // move originalRouteInfos from the to be deleted route
                     for (int k = 0; k < routeInfoI->originalRouteInfos.size(); k++) {
                         RouteInfo *originalRouteInfo = routeInfoI->originalRouteInfos.at(k);
                         IPv4Configurator::RouteInfo *matchingRouteInfo = routingTableInfo.findBestMatchingRouteInfo(originalRouteInfo->destination, i + 1, m + 1);
                         ASSERT(matchingRouteInfo && matchingRouteInfo->color == originalRouteInfo->color);
                         matchingRouteInfo->originalRouteInfos.push_back(originalRouteInfo);
                     }
+                    // move originalRouteInfos from the to be deleted route
                     for (int k = 0; k < routeInfoJ->originalRouteInfos.size(); k++) {
                         RouteInfo *originalRouteInfo = routeInfoJ->originalRouteInfos.at(k);
                         IPv4Configurator::RouteInfo *matchingRouteInfo = routingTableInfo.findBestMatchingRouteInfo(originalRouteInfo->destination, j + 1, m + 1);
                         ASSERT(matchingRouteInfo && matchingRouteInfo->color == originalRouteInfo->color);
                         matchingRouteInfo->originalRouteInfos.push_back(originalRouteInfo);
                     }
+                    // move originalRouteInfos from the following routes if necessary
                     for (int k = m + 1; k < routingTableInfo.routeInfos.size(); k++) {
                         RouteInfo *followingRouteInfo = routingTableInfo.routeInfos.at(k);
                         for (int l = 0; l < followingRouteInfo->originalRouteInfos.size(); l++) {

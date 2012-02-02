@@ -25,7 +25,7 @@ package inet.networklayer.autorouting.ipv4;
 //          @hosts          "host* router[0..3]"
 //          @names          i.e. interface names, like "eth* ppp0"
 //          @towards        neighbor host names, like "ap switch"
-//          @configure      "true" (default) or "false"  (not implemented!!!)
+//          @configure      "true" (default) or "false"
 //          @address        "10.0.x.x"
 //          @netmask        "255.255.x.x"
 //       route

@@ -45,7 +45,7 @@ class INET_API IPv4Configurator : public cSimpleModule
             NodeInfo *nodeInfo;
             LinkInfo *linkInfo;
             InterfaceEntry *interfaceEntry;
-            bool configure;  //TODO code should obey it!
+            bool configure;
             IPv4Address address;
             uint32 addressSpecifiedBits;
             IPv4Address netmask;
