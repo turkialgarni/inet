@@ -97,7 +97,7 @@ void RoutingTableRecorder::ensureRoutingLogFileOpen()
         std::string fname = ev.getConfig()->getAsFilename(CFGID_ROUTINGLOG_FILE);
         routingLogFile = fopen(fname.c_str(), "w");
         if (!routingLogFile)
-            throw cRuntimeError("Cannot open file %s", fname);
+            throw cRuntimeError("Cannot open file %s", fname.c_str());
     }
 }
 
